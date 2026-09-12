@@ -162,7 +162,65 @@ higher weight precision. It is bounded at one retry, after which the
 deterministic rules planner takes the episode -- so the robot always has a valid
 plan, and the VLM is an improvement rather than a dependency.
 
-Measured results: `out/planner_bench.md`, produced by `scripts/bench_planner.py`.
+### Measured
+
+`scripts/bench_planner.py`, 2-3 seeds, up to 3 attempts each, on this host's CPU:
+
+| Model | Weights | Size | Schedulable plans | Median wall time |
+| --- | --- | --- | --- | --- |
+| qwen2-vl-2b-ov-int4 | INT4 (ratio 1.0) | 1844 MB | 0 | 33 s |
+| qwen2-vl-2b-ov-int8 | INT8 | 2475 MB | 0 | 62 s |
+
+The stage each attempt reached is more informative than the totals:
+
+- **INT8 reaches the scheduler on the first attempt, every time.** Its JSON
+  parses, every object and slot exists, every arm assignment is reachable. It
+  fails on one specific physical error: it plans *every pick first* and then
+  every place, so the second pick asks an arm to grasp something while it is
+  still holding the first object.
+- **INT4 does not reliably emit a plan at all** -- empty node lists, or output
+  cut off mid-object. With targeted feedback its second attempt does reach the
+  scheduler, which says the weights still carry the task; the 4-bit damage is to
+  the model's ability to hold a long structured answer together.
+- The failure is stable across seeds and does not respond to the fixes that
+  usually work: an explicit rule ("an arm holds ONE object at a time"), a worked
+  example that interleaves pick/place across two objects, and a feedback
+  sentence naming the exact edit ("insert a place before the second pick") were
+  all tried, measured, and did not change it.
+
+So the conclusion is about model capacity, not about the runtime: **Qwen2-VL-2B
+cannot reliably sequence this task**, and quantisation is not the binding
+constraint -- INT8 fails the same way INT4's better attempts do. A larger
+planner (or a constrained decoder that can only emit legal transitions) is the
+fix; more bits is not.
+
+What the system does about it is the point. Running the full pipeline with
+`--planner "vlm+rules"` on seed 0: the VLM is called, its plan is rejected by
+the scheduler, the deterministic planner takes over, and the episode runs.
+**A planner that fails does not stop the robot.** That is the property worth
+having on edge hardware, and it is why the validator boundary was built before
+the model was plugged in.
+
+## 6. Device x precision latency
+
+`scripts/bench_openvino.py` on the INT8 detector, 20 iterations, input shapes
+pinned to the real workload (6 prompts x 16 tokens, 1x3x768x768 image):
+
+| Device | Precision | p50 (ms) | p95 (ms) | Throughput (inf/s) |
+| --- | --- | --- | --- | --- |
+| CPU | native | 64.3 | 66.8 | 15.5 |
+| CPU | f32 | 78.8 | 100.9 | 12.7 |
+| CPU | f16 | 69.3 | 77.4 | 14.4 |
+| CPU | bf16 | 82.1 | 88.6 | 12.2 |
+| GPU | native | 722.2 | 724.9 | 1.4 |
+| GPU | f32 | 722.8 | 731.7 | 1.4 |
+| GPU | f16 | 724.0 | 726.7 | 1.4 |
+| GPU | bf16 | -- | -- | rejected by the plugin |
+
+No NPU row: this host is AMD, and OpenVINO reports only CPU and a discrete
+NVIDIA GPU. On a Core Ultra Series 2/3 the same command produces NPU and Intel
+iGPU rows with no change -- the script sweeps whatever devices OpenVINO reports
+and labels the host honestly either way.
 
 ## Reproducing all of this
 

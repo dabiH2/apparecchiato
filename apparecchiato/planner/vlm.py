@@ -76,8 +76,9 @@ class VLMPlanner(Planner):
                 if attempt + 1 >= self.max_attempts:
                     raise PlannerError(" | ".join(attempts)) from exc
                 prompt = (f"{self._build_prompt(instruction, scene)}\n\n"
-                          f"Your previous answer was rejected: {exc}\n"
-                          "Fix exactly that and reply with the corrected JSON only.")
+                          f"Your previous answer was rejected. Reason:\n{exc}\n\n"
+                          f"{_fix_hint(exc)}\n"
+                          "Reply with the whole corrected JSON object and nothing else.")
         raise PlannerError(" | ".join(attempts))
 
     def _finish(self, raw: str, instruction: str, scene, attempt: int) -> TaskGraph:
@@ -329,6 +330,36 @@ def validate_against_scene(graph: TaskGraph, scene) -> None:
 
 
 # --- small helpers ---------------------------------------------------------
+
+def _fix_hint(exc: Exception) -> str:
+    """Turn a rejection into the specific edit that would fix it.
+
+    Echoing an error back at a 2B model is not enough -- it was told an arm
+    holds one object at a time in the system prompt and planned two picks in a
+    row anyway. What works is naming the edit: not "this is wrong" but "insert a
+    place before the second pick". One sentence, in the vocabulary of the schema
+    it is writing.
+    """
+    msg = str(exc)
+    if "every candidate arm is busy" in msg or "grasp state" in msg:
+        return ("An arm can only hold one object. Insert a place or handoff node "
+                "for the object that arm is already holding BEFORE it picks "
+                "anything else, and make the new pick depend on it.")
+    if "unreachable" in msg or "which only" in msg:
+        return ("That arm cannot reach that point. Either assign the other arm, "
+                "or route the object through a handoff node between the pick and "
+                "the place.")
+    if "without ever picking" in msg:
+        return "Add a pick node for that object, and make the place depend on it."
+    if "before opening the drawer" in msg:
+        return ("The cutlery is inside the drawer. Put the open_drawer node "
+                "first and make the cutlery picks depend on it.")
+    if "no JSON" in msg or "invalid JSON" in msg or "empty plan" in msg:
+        return ("Your answer was not valid JSON. Emit one object starting with "
+                '{"nodes": [ and ending with ]}, with no text around it, and '
+                "keep every rationale under six words so it fits.")
+    return "Correct exactly that and change nothing else."
+
 
 def _salvage_nodes(blob: str) -> tuple[list, int]:
     """Parse the node objects that CAN be parsed; count the ones that cannot.

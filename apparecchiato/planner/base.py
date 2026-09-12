@@ -62,15 +62,24 @@ Worked example. Copy this shape exactly: every node has the same five keys, the
 object and target values are bare names in quotes, and the whole reply is one
 JSON object with no text before or after it.
 
-Observation: plate reachable by A, plate slot reachable by B.
+Observation: plate reachable by A, plate slot reachable by B; mug reachable by B,
+mug slot reachable by B.
+
+Note the order. Each object is picked and then FINISHED -- placed or handed off --
+before the next object is picked, because an arm holding something cannot pick
+anything else. Never emit two picks for the same arm in a row.
 
 {"nodes": [
   {"id": "n0", "skill": "pick", "args": {"object": "plate"}, "arm": "A",
-   "deps": [], "rationale": "only arm A reaches the plate"},
+   "deps": [], "rationale": "only A reaches it"},
   {"id": "n1", "skill": "handoff", "args": {"object": "plate"}, "arm": "any",
-   "deps": ["n0"], "rationale": "the slot is out of arm A's reach"},
+   "deps": ["n0"], "rationale": "slot out of A's reach"},
   {"id": "n2", "skill": "place", "args": {"object": "plate", "target": "plate"},
-   "arm": "B", "deps": ["n1"], "rationale": "arm B reaches the slot"}
+   "arm": "B", "deps": ["n1"], "rationale": "B reaches the slot"},
+  {"id": "n3", "skill": "pick", "args": {"object": "mug"}, "arm": "B",
+   "deps": ["n2"], "rationale": "B is free again"},
+  {"id": "n4", "skill": "place", "args": {"object": "mug", "target": "mug"},
+   "arm": "B", "deps": ["n3"], "rationale": "B reaches both"}
 ]}
 """
 
