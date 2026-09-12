@@ -24,7 +24,7 @@
     "spoon_placed": 1.0
   },
   "mean_steps": 11.0,
-  "mean_wall_s": 4.879692819999036,
+  "mean_wall_s": 4.59207525000038,
   "mean_parallel_fraction": 0.6363636363636365,
   "failures": [],
   "per_seed": [
@@ -32,7 +32,7 @@
       "seed": 0,
       "success": true,
       "steps": 11,
-      "wall_s": 5.09,
+      "wall_s": 6.26,
       "subgoals": {
         "drawer_open": true,
         "plate_placed": true,
@@ -47,7 +47,7 @@
       "seed": 1,
       "success": true,
       "steps": 11,
-      "wall_s": 4.96,
+      "wall_s": 6.44,
       "subgoals": {
         "drawer_open": true,
         "plate_placed": true,
@@ -62,7 +62,7 @@
       "seed": 2,
       "success": true,
       "steps": 11,
-      "wall_s": 5.12,
+      "wall_s": 5.68,
       "subgoals": {
         "drawer_open": true,
         "plate_placed": true,
@@ -77,7 +77,7 @@
       "seed": 3,
       "success": true,
       "steps": 11,
-      "wall_s": 5.0,
+      "wall_s": 4.42,
       "subgoals": {
         "drawer_open": true,
         "plate_placed": true,
@@ -92,7 +92,7 @@
       "seed": 4,
       "success": true,
       "steps": 11,
-      "wall_s": 4.68,
+      "wall_s": 4.0,
       "subgoals": {
         "drawer_open": true,
         "plate_placed": true,
@@ -107,7 +107,7 @@
       "seed": 5,
       "success": true,
       "steps": 11,
-      "wall_s": 5.01,
+      "wall_s": 4.23,
       "subgoals": {
         "drawer_open": true,
         "plate_placed": true,
@@ -122,7 +122,7 @@
       "seed": 6,
       "success": true,
       "steps": 11,
-      "wall_s": 4.48,
+      "wall_s": 3.91,
       "subgoals": {
         "drawer_open": true,
         "plate_placed": true,
@@ -137,7 +137,7 @@
       "seed": 7,
       "success": true,
       "steps": 11,
-      "wall_s": 4.71,
+      "wall_s": 2.8,
       "subgoals": {
         "drawer_open": true,
         "plate_placed": true,
@@ -152,7 +152,7 @@
       "seed": 8,
       "success": true,
       "steps": 11,
-      "wall_s": 4.94,
+      "wall_s": 4.12,
       "subgoals": {
         "drawer_open": true,
         "plate_placed": true,
@@ -167,7 +167,7 @@
       "seed": 9,
       "success": true,
       "steps": 11,
-      "wall_s": 4.82,
+      "wall_s": 4.05,
       "subgoals": {
         "drawer_open": true,
         "plate_placed": true,

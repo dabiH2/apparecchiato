@@ -150,12 +150,12 @@ failure is the spoon hand-off" tells you what to fix.
 | Run | Planner | Seeds | Task success |
 | --- | --- | --- | --- |
 | [results/eval_vlm_seeds0-9.md](results/eval_vlm_seeds0-9.md) | `vlm+rules` (Qwen2-VL-2B, OpenVINO INT4) | 0–9 | **100%** (10/10) |
-| [results/eval_rules_seeds0-9.md](results/eval_rules_seeds0-9.md) | `rules` | 0–9 | **100%** (10/10) |
-| [results/eval_rules_seeds10-39.md](results/eval_rules_seeds10-39.md) | `rules` | 10–39 | **100%** (30/30) |
+| [results/eval_rules_seeds0-99.md](results/eval_rules_seeds0-99.md) | `rules` | 0–99 | **100%** (100/100) |
 
 All seven subgoals — drawer, plate, fork, spoon, mug, mug-upright, bottle-upright — are at
-100% in every run. Seeds 10–39 were never looked at while debugging; they are there so the
-headline number is not the number the code was tuned against.
+100% in every run, and the mean is 11.0 steps of 11: no episode ends early. The hundred-seed
+sweep matters more than the ten: only seeds 0–9 were ever looked at while debugging, so the
+other ninety are the number the code was *not* tuned against.
 
 64% of each plan is parallelisable across the two arms. That figure used to read 82%, and
 the 18 points are a deliberate purchase: the shared lens both arms can reach is about
@@ -167,8 +167,8 @@ change. See `_reserve_the_lens_for_handoffs` in `apparecchiato/scheduler.py`.
 Reproduce:
 
 ```bash
-python scripts/run_eval.py --seeds 0-9  --planner vlm+rules --out out/eval_vlm
-python scripts/run_eval.py --seeds 10-39 --planner rules    --out out/eval30 --no-video
+python scripts/run_eval.py --seeds 0-9  --planner vlm+rules --out out/eval_vlm --camera cinematic
+python scripts/run_eval.py --seeds 0-99 --planner rules     --out out/eval100 --no-video
 ```
 
 ---

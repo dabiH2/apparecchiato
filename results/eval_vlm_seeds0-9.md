@@ -7,7 +7,7 @@
 **Task success: 100%** (10/10 seeds)
 
 - Mean steps per episode: 11.0
-- Mean wall clock per episode: 4.9 s
+- Mean wall clock per episode: 4.6 s
 - Mean parallelisable share of the plan: 64%
 
 ## Subgoal success
