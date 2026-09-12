@@ -502,30 +502,49 @@ def pour(steady_arm: str, pour_arm: str, scene, source: str, into: str,
     b_back = _standoff(pour_arm, bottle, LIFT_H, prefer=b_over, what="return bottle")
     b_down = _ik_world(bottle, pour_arm, prefer=b_back, what="set bottle down")
 
+    # Hold the objects at their own widths, not at GRIPPER_CLOSED. This skill was
+    # the one place still closing to 2 mm, which against a 28 mm bottle means the
+    # actuator spends the whole pour driving the pads through it: measured at
+    # 'pour:tip', the left jaw was commanded to 17 mm, sat at -1.6 mm, and pushed
+    # with 16.5 N while the bottle squeezed 1.35 mm out of the pads.
+    b_grip = grip_for(scene.by_name(source).kind)
+    s_grip = grip_for(scene.by_name(into).kind if into in
+                      {o.name for o in scene.objects} else "mug")
+
+    # The bottle's trip from its stand to over the mug is a long lateral move
+    # with a payload, and doing it in one joint-space interpolation swung it
+    # through the cabinet: measured, arm A's shoulder pan sat 1.18 rad behind its
+    # command at -30 N with the bottle 0.86 mm inside the cabinet wall. So it
+    # tucks in, pans while tucked, and extends again -- the same turn_pose
+    # discipline as every other transit, applied to the middle of the skill
+    # rather than only to its ends.
+    b_home = turn_pose(pour_arm, bottle)
+    b_toward_mug = turn_pose(pour_arm, mug)
     return Motion("pour", [
         # Both arms turn while tucked before extending -- same reason as
-        # everywhere else (see turn_pose). The bottle's own trip out and back
-        # stays on one heading throughout, so it needs no extra turn.
+        # everywhere else (see turn_pose).
         Waypoint(steady_arm, turn_pose(steady_arm, mug), GRIPPER_OPEN,
                  "pour:steady-turn", steps=40, dwell=0.15),
         Waypoint(steady_arm, s_pre, GRIPPER_OPEN, "pour:steady-approach", steps=45),
         Waypoint(steady_arm, s_at, GRIPPER_OPEN, "pour:steady-descend", steps=25),
-        Waypoint(steady_arm, s_at, GRIPPER_CLOSED, "pour:steady-hold", dwell=0.3, steps=2),
-        Waypoint(pour_arm, turn_pose(pour_arm, bottle), GRIPPER_OPEN,
-                 "pour:bottle-turn", steps=40, dwell=0.15),
+        Waypoint(steady_arm, s_at, s_grip, "pour:steady-hold", dwell=0.3, steps=2),
+        Waypoint(pour_arm, b_home, GRIPPER_OPEN, "pour:bottle-turn", steps=40, dwell=0.15),
         Waypoint(pour_arm, b_pre, GRIPPER_OPEN, "pour:bottle-approach", steps=45),
         Waypoint(pour_arm, b_at, GRIPPER_OPEN, "pour:bottle-descend", steps=25),
-        Waypoint(pour_arm, b_at, GRIPPER_CLOSED, "pour:bottle-grasp", dwell=0.3, steps=2),
-        Waypoint(pour_arm, b_up, GRIPPER_CLOSED, "pour:bottle-lift", steps=30),
-        Waypoint(pour_arm, b_over, GRIPPER_CLOSED, "pour:bottle-over-mug", steps=40),
-        Waypoint(pour_arm, b_tip, GRIPPER_CLOSED, "pour:tip", dwell=1.2, steps=35),
-        Waypoint(pour_arm, b_over, GRIPPER_CLOSED, "pour:upright", steps=35),
-        Waypoint(pour_arm, b_back, GRIPPER_CLOSED, "pour:return", steps=40),
-        Waypoint(pour_arm, b_down, GRIPPER_CLOSED, "pour:set-down", steps=25),
+        Waypoint(pour_arm, b_at, b_grip, "pour:bottle-grasp", dwell=0.3, steps=2),
+        Waypoint(pour_arm, b_up, b_grip, "pour:bottle-lift", steps=30),
+        Waypoint(pour_arm, b_home, b_grip, "pour:bottle-tuck", steps=35, dwell=0.1),
+        Waypoint(pour_arm, b_toward_mug, b_grip, "pour:bottle-swing", steps=40, dwell=0.1),
+        Waypoint(pour_arm, b_over, b_grip, "pour:bottle-over-mug", steps=40),
+        Waypoint(pour_arm, b_tip, b_grip, "pour:tip", dwell=1.2, steps=35),
+        Waypoint(pour_arm, b_over, b_grip, "pour:upright", steps=35),
+        Waypoint(pour_arm, b_toward_mug, b_grip, "pour:untuck", steps=35, dwell=0.1),
+        Waypoint(pour_arm, b_home, b_grip, "pour:swing-back", steps=40, dwell=0.1),
+        Waypoint(pour_arm, b_back, b_grip, "pour:return", steps=40),
+        Waypoint(pour_arm, b_down, b_grip, "pour:set-down", steps=25),
         Waypoint(pour_arm, b_down, GRIPPER_OPEN, "pour:bottle-release", dwell=0.2, steps=2),
         Waypoint(pour_arm, b_up, GRIPPER_OPEN, "pour:bottle-clear", steps=25),
-        Waypoint(pour_arm, turn_pose(pour_arm, bottle), GRIPPER_OPEN,
-                 "pour:bottle-withdraw", steps=40),
+        Waypoint(pour_arm, b_home, GRIPPER_OPEN, "pour:bottle-withdraw", steps=40),
         Waypoint(steady_arm, s_at, GRIPPER_OPEN, "pour:steady-release", dwell=0.2, steps=2),
         Waypoint(steady_arm, s_pre, GRIPPER_OPEN, "pour:steady-clear", steps=25),
         Waypoint(steady_arm, turn_pose(steady_arm, mug), GRIPPER_OPEN,
