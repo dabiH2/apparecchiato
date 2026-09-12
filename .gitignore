@@ -7,6 +7,10 @@ models/
 *.mp4
 *.wav
 !assets/*.wav
+# The judging packet is meant to be self-contained in a fresh clone, so its
+# video travels with the repo. ~3 MB, and it is the difference between a judge
+# watching the demo and a judge reading about it.
+!judging/video/*.mp4
 .DS_Store
 .pytest_cache/
 
