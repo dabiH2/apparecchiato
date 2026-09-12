@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+out/
+models/
+*.mp4
+*.wav
+!assets/*.wav
+.DS_Store
+.pytest_cache/

@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "apparecchiato"
+version = "0.1.0"
+description = "Bimanual VLA table setting on dual simulated SO-101 arms, optimised for Intel Core Ultra with OpenVINO"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = ["numpy>=1.26", "mujoco>=3.2.0"]
+
+[project.optional-dependencies]
+intel = ["openvino>=2026.3", "optimum[openvino]>=1.21", "transformers>=4.44", "torch>=2.3"]
+voice = ["websockets>=12.0", "sounddevice>=0.4.6"]
+video = ["imageio>=2.34", "imageio-ffmpeg>=0.4.9", "pillow>=10.0"]
+dev = ["pytest>=8.0"]
+
+[tool.setuptools.packages.find]
+include = ["apparecchiato*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
