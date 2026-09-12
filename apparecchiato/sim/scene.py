@@ -22,7 +22,7 @@ from ..kinematics import (
 from .layout import (
     SceneSpec, ARM_A_BASE, ARM_B_BASE, ARM_MOUNT_YAW, DRAWER_CLOSED_Y,
     DRAWER_OPEN_TRAVEL, DRAWER_KNOB_Z, TABLE_HALF_X, TABLE_Y_MIN, TABLE_Y_MAX,
-    DRAWER_FLOOR_TOP, OBJECT_HALF_H, OBJECT_RADIUS,
+    DRAWER_FLOOR_TOP, OBJECT_HALF_H, OBJECT_TOP_H, OBJECT_RADIUS,
 )
 
 GRIPPER_TRAVEL = 0.036
@@ -126,7 +126,7 @@ def _arm(parent, name: str, base_xyz, mount_yaw: float, rgba):
         # `diagnose.py --track`, which resolves the slip into along/across/up).
         _e(fng, "geom", type="box", size=[0.010, 0.004, 0.026], pos=[0, 0, 0.026],
            rgba=[0.15, 0.15, 0.18, 1], mass=0.012,
-           friction=[2.2, 0.05, 0.002], condim=4,
+           friction=[2.2, 0.05, 0.01], condim=6,
            # Stiff, near-rigid pad contact. At the default softness a 25 N jaw
            # actuator simply pushes the pads THROUGH a thin object: the grasp
            # probe shows both fingers biting the fork, then the fingers touching
@@ -145,7 +145,14 @@ def _object(parent, o):
         pos[2] = DRAWER_FLOOR_TOP + OBJECT_HALF_H[o.kind] * o.scale
     body = _e(parent, "body", name=o.name, pos=pos, euler=[0, 0, float(o.yaw)])
     _e(body, "freejoint", name=f"{o.name}_free")
-    common = dict(rgba=o.rgba, friction=[o.friction, 0.02, 0.002], condim=4,
+    # condim 6, not 4. Sliding and torsional friction alone do not stop a DISC
+    # from ROLLING between two flat pads, and that is what was ending the plate
+    # hand-off: measured mid-carry, the jaws were held 31.8 mm apart by a 26 mm
+    # plate, which is only possible if the plate has tipped up on edge inside
+    # them (26*cos45 + 18*sin45 = 31.1 mm). It then dropped flat on release,
+    # 20 mm from the transfer point, and the taker closed on empty table.
+    # Rolling friction needs the full 6-dimensional contact.
+    common = dict(rgba=o.rgba, friction=[o.friction, 0.05, 0.01], condim=6,
                   solimp=[0.99, 0.9995, 0.0005], solref=[0.004, 1])
     s = o.scale
     # Everything is sized for a 36 mm gripper. A 110 mm plate and a 64 mm mug
@@ -171,10 +178,15 @@ def _object(parent, o):
         _e(body, "geom", type="cylinder", size=[OBJECT_RADIUS["mug"] * s, h],
            pos=at(h), mass=o.mass, **common)
     elif o.kind == "bottle":
-        h = 0.040 * s                      # body: 0 .. 80 mm
+        # Body and neck are derived from the dimension table rather than written
+        # out again: the body is symmetric about the grasp height by convention,
+        # and the neck makes up whatever is left up to TOP_H. Re-deriving them
+        # means shortening the bottle is a one-line change there, not a two-file
+        # change that silently disagrees.
+        h = OBJECT_HALF_H["bottle"] * s            # body: 0 .. 52 mm
         _e(body, "geom", type="cylinder", size=[OBJECT_RADIUS["bottle"] * s, h],
            pos=at(h), mass=o.mass * 0.8, **common)
-        nh = 0.012 * s                     # neck: 80 .. 104 mm
+        nh = (OBJECT_TOP_H["bottle"] * s - 2 * h) / 2.0   # neck: 52 .. 68 mm
         _e(body, "geom", type="cylinder", size=[0.008 * s, nh],
            pos=at(2 * h + nh), mass=o.mass * 0.2, **common)
     else:  # spoon / fork: a shaft with a head, grasped across the shaft

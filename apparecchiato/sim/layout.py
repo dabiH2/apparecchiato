@@ -46,6 +46,10 @@ CAB_KEEPOUT_FRONT = 0.045    # how far in front of the shut knob to stay clear
 # reach that (x, y) at the object's own resting height AND at the standoff
 # height they approach and retreat through.
 TRANSFER_STANDOFF_Z = 0.050
+# Clearance the transfer point keeps from the goal slots and the bottle, on top
+# of both radii. Smaller than a slot's own margin: see _slot_clear_of. 8 mm is
+# what puts a pad beside the plate without touching its neighbour.
+TRANSFER_MARGIN = 0.008
 
 DRAWER_FLOOR_TOP = 0.014     # world z of the drawer's inner floor (see sim.scene)
 
@@ -63,17 +67,30 @@ DRAWER_FLOOR_TOP = 0.014     # world z of the drawer's inner floor (see sim.scen
 # (TOP_H - HALF_H) sweeps the open jaws straight through the object sideways --
 # which is exactly how a 90 mm mug got knocked 43 mm off its spot before the jaws
 # closed on empty air. Everything here is sized so a 75 mm standoff clears.
+#
+# TOP_H is also bounded from ABOVE, by the carry plane. A picked object rides at
+# LIFT_H above where it was grasped, and since every origin sits at HALF_H the
+# underside of whatever is being carried is at a fixed ~87 mm for all five kinds.
+# Anything standing taller than that is an obstacle that cannot be flown over,
+# and it cannot be dodged by carrying higher either: this arm has no top-down
+# pose above z = 0.10 at all (see workspace_bounds). The bottle used to stand
+# 104 mm and it was exactly that obstacle -- on seed 0 arm A carried the plate
+# from its spawn to the transfer point, clipped the bottle's neck 20 mm off the
+# line, knocked it flat, and the pour then failed five steps later with "arm A
+# cannot reach bottle", because a bottle lying on its side is 27 mm from where
+# anyone expected it. So the bottle is a squat carafe: still the tallest thing
+# on the table, still pours, and passes under every carry with 13 mm to spare.
 OBJECT_HALF_H = {
     "plate": 0.009,    # a 40 mm side plate: the jaws open 36 mm, a dinner plate is not pickable
     "mug": 0.030,      # 60 mm espresso cup
-    "bottle": 0.040,   # grasped low on the body: the annulus closes up with height
+    "bottle": 0.026,   # grasped low on the body: the annulus closes up with height
     "spoon": 0.009,
     "fork": 0.009,
 }
 OBJECT_TOP_H = {
     "plate": 0.018,
     "mug": 0.060,
-    "bottle": 0.104,   # body plus neck
+    "bottle": 0.068,   # squat carafe: see the carry-plane note above
     "spoon": 0.018,
     "fork": 0.018,
 }
@@ -347,23 +364,26 @@ def sample_scene(seed: int) -> SceneSpec:
     }.items()}
     gz = {k: GRASP_Z[k] * v for k, v in scales.items()}
 
-    # The drawer is placed FIRST so the tableware can be kept out of it. Sampling
-    # the plate first and the cabinet afterwards let them overlap: on seed 0 the
-    # plate spawned 13 mm inside the cabinet, which both wedges the drawer and
-    # makes the plate impossible to pick.
-    drawer_x, open_y = _sample_drawer(rng, gz=gz, scales=scales)
+    # The place setting is laid out FIRST, and everything else -- the cabinet
+    # included -- is then kept off it. The setting has to live in the shared lens
+    # (both arms must reach the mug slot, for the pour) and the lens is small, so
+    # constraining the setting to dodge things already placed rejects every
+    # candidate; constraining them to dodge four fixed points is easy, because
+    # what is left has room to move.
+    #
+    # This used to run the other way round, with the drawer placed first so the
+    # tableware could be kept out of it. Then the SLOTS turned out never to have
+    # been checked against the cabinet at all -- only the object spawns were --
+    # and on seed 0 the mug slot landed against the cabinet front: arm B drove a
+    # finger 4 mm into the cabinet with the shoulder saturated at 28 N and let
+    # the mug go 131 mm short. Adding that check under the old order broke 8 of
+    # 30 seeds outright, because it is the setting that has nowhere else to go.
+    goals = _sample_place_setting(rng, gz=gz)
+    drawer_x, open_y = _sample_drawer(rng, gz=gz, scales=scales, goals=goals)
 
     def clear_of_cabinet(p) -> bool:
         return not (abs(float(p[0]) - drawer_x) < CAB_KEEPOUT_X
                     and float(p[1]) > DRAWER_CLOSED_Y - CAB_KEEPOUT_FRONT)
-
-    # The place setting is laid out FIRST, and the objects are then kept off it.
-    # The other order does not work: the setting has to live in the shared lens
-    # (both arms must reach the mug slot, for the pour) and the lens is small, so
-    # constraining the setting to dodge three already-placed objects rejects
-    # every candidate. Constraining the objects to dodge four fixed points is
-    # easy, because the regions they spawn in are large.
-    goals = _sample_place_setting(rng, gz=gz)
 
     def sample_clear(region, z, kind=None, avoid_goals=()):
         for _ in range(200):
@@ -444,10 +464,26 @@ def sample_scene(seed: int) -> SceneSpec:
     # arms across the whole range of grasp heights an object might be transferred
     # at -- the annulus shifts outward as the tool drops, so a point valid at
     # 50 mm is not necessarily valid at 15 mm.
+    #
+    # It must ALSO stand clear of everything that is still on the table when the
+    # hand-off happens: the four goal slots and the bottle. This was checked for
+    # reachability only, and on seed 0 the transfer point landed 16 mm from the
+    # mug's slot -- the mug had already been placed there, arm A swept the plate
+    # into it on the way in, knocked it over, and set the plate down 52 mm short.
+    # Arm B then closed on empty air, and the pour failed four steps later
+    # because the mug was lying on its side 77 mm from where it belonged. The
+    # plate and mug SPAWNS are deliberately not obstacles here: both have been
+    # picked up by the time anything is transferred, and the cutlery is still in
+    # the drawer.
+    transfer_obstacles = dict(goals)
+    transfer_obstacles["bottle"] = tuple(bottle_p)
     z_lo, z_hi = min(gz.values()), max(gz.values())
     handoff_point = None
-    for _ in range(120):
+    for _ in range(600):
         cand = sample_clear(_SHARED, z_lo)
+        if not _slot_clear_of(cand, "plate", transfer_obstacles, scales,
+                              margin=TRANSFER_MARGIN):
+            continue
         if all(in_shared_workspace([cand[0], cand[1], z])
                for z in (z_hi, TRANSFER_STANDOFF_Z)):
             handoff_point = cand
@@ -502,9 +538,17 @@ def _wall_tone(rng) -> tuple:
     return (r, g, b, 1.0)
 
 
-def _sample_drawer(rng, *, gz: dict, scales: dict, tries: int = 400) -> tuple[float, float]:
+def _sample_drawer(rng, *, gz: dict, scales: dict, goals: dict | None = None,
+                   tries: int = 400) -> tuple[float, float]:
     """Drawer x such that arm A can pull the knob through its whole travel and
     then reach the cutlery inside, checking intermediate positions too.
+
+    `goals`, when given, are the place-setting slots the cabinet must not stand
+    on. The drawer yields to the setting rather than the other way round because
+    the setting has almost no freedom and the drawer has plenty: a full setting
+    fits in roughly 3% of draws from the shared lens, and measuring the two
+    together showed every one of those lands inside the cabinet keep-out once
+    the drawer is at x >= -0.09, while x <= -0.11 costs nothing at all.
 
     The cutlery is checked at its height INSIDE THE DRAWER, not at the height it
     would rest at on the table. Those differ by the drawer floor -- 14 mm -- and
@@ -516,6 +560,10 @@ def _sample_drawer(rng, *, gz: dict, scales: dict, tries: int = 400) -> tuple[fl
     open_y = DRAWER_CLOSED_Y - DRAWER_OPEN_TRAVEL
     for _ in range(tries):
         x = float(rng.uniform(-0.17, -0.07))
+        if goals and any(abs(float(g[0]) - x) < CAB_KEEPOUT_X
+                         and float(g[1]) > DRAWER_CLOSED_Y - CAB_KEEPOUT_FRONT
+                         for g in goals.values()):
+            continue
         travel = [np.array([x, y, DRAWER_KNOB_Z])
                   for y in np.linspace(DRAWER_CLOSED_Y, open_y, 6)]
         contents_y = open_y + DRAWER_CONTENT_OFFSET_Y
@@ -547,16 +595,23 @@ _CUTLERY_LAYOUTS = (
 )
 
 
-def _slot_clear_of(goal, kind: str, obstacles: dict, scales: dict) -> bool:
+def _slot_clear_of(goal, kind: str, obstacles: dict, scales: dict,
+                   margin: float = 0.030) -> bool:
     """Is this goal slot far enough from everything already on the table?
 
     "Far enough" is both radii plus a gripper-pad margin: the jaws have to get
     down beside the object being placed, so touching is not the threshold --
     having room for 8 mm of finger on the near side is.
+
+    The margin is smaller for the transfer point (TRANSFER_MARGIN). A slot is
+    somewhere an object has to SIT next to its neighbours for the rest of the
+    episode; the transfer point is somewhere one object is put down and picked
+    straight back up, and the shared lens is not big enough to hold both the
+    setting and a full slot's worth of clearance.
     """
     r_slot = OBJECT_RADIUS[kind] * scales.get(kind, 1.0)
     for name, p in obstacles.items():
-        need = r_slot + OBJECT_RADIUS[name] * scales.get(name, 1.0) + 0.030
+        need = r_slot + OBJECT_RADIUS[name] * scales.get(name, 1.0) + margin
         if float(np.linalg.norm(np.asarray(goal)[:2] - np.asarray(p)[:2])) < need:
             return False
     return True
@@ -599,9 +654,10 @@ def _sample_place_setting(rng, *, gz: dict, tries: int = 300) -> dict:
             for name, (dx, dy) in layout.items():
                 goals[name] = (float(plate_goal[0] + dx), float(plate_goal[1] + dy),
                                gz[name])
-            if all(can_reach(np.asarray(goals[n]), DRAWER_ARM, TOP_DOWN)
-                   for n in ("fork", "spoon")):
-                return goals
+            if not all(can_reach(np.asarray(goals[n]), DRAWER_ARM, TOP_DOWN)
+                       for n in ("fork", "spoon")):
+                continue
+            return goals
     raise RuntimeError("could not place a fully reachable dinner setting")
 
 
@@ -620,13 +676,26 @@ def validate_scene(spec: SceneSpec) -> None:
              if o.inside_drawer else o.grasp_point)
         if not reaching_arms(p):
             problems.append(f"{o.name} at {np.round(p, 3)} is unreachable")
+    knob_x = spec.by_name("spoon").pos[0] + 0.032
     for name, g in spec.goals.items():
         if not reaching_arms(np.asarray(g)):
             problems.append(f"goal for {name} at {np.round(g, 3)} is unreachable")
+        # A slot inside the cabinet keep-out is as unusable as an unreachable
+        # one, and fails later and more confusingly: the arm gets there, drives
+        # a finger into the cabinet and releases the object short.
+        if (abs(float(g[0]) - knob_x) < CAB_KEEPOUT_X
+                and float(g[1]) > DRAWER_CLOSED_Y - CAB_KEEPOUT_FRONT):
+            problems.append(f"goal for {name} at {np.round(g, 3)} is inside the cabinet")
     if not in_shared_workspace(np.asarray(spec.handoff_point)):
         problems.append(
             f"hand-off point {np.round(spec.handoff_point, 3)} is not reachable by both arms")
-    knob_x = spec.by_name("spoon").pos[0] + 0.032
+    scales = {o.kind: o.scale for o in spec.objects}
+    obstructing = dict(spec.goals)
+    obstructing["bottle"] = spec.by_name("bottle").pos
+    if not _slot_clear_of(spec.handoff_point, "plate", obstructing, scales,
+                          margin=TRANSFER_MARGIN):
+        problems.append(
+            f"hand-off point {np.round(spec.handoff_point, 3)} is on top of a slot or the bottle")
     for o in spec.objects:
         if o.inside_drawer:
             continue

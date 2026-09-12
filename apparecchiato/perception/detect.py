@@ -281,7 +281,7 @@ class ColourDetector(Detector):
     SILHOUETTE_Z = {
         "plate": 0.016,
         "mug": 0.052,
-        "bottle": 0.086,
+        "bottle": 0.058,   # 68 mm carafe, same ~0.86 x TOP_H as the others
         "spoon": 0.016,
         "fork": 0.016,
     }
