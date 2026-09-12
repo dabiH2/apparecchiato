@@ -313,6 +313,17 @@ POUR_CLEARANCE = 0.028
 # being a centimetre off, not be handed a table where it never can be.
 POUR_SLACK = 0.0
 
+# How much standoff an object's grasp point and its slot must have. MIN_CLEARANCE
+# (22 mm) is what the skills will *accept*; this is what the sampler *requires*,
+# and the gap between them is deliberate. A point that only just clears 22 mm
+# sits at the very edge of the annulus, where the arm is near full extension and
+# the position servo has least authority along z. Measured on seed 61: the plate
+# was 219 mm from arm A's base, `_standoff` could only find 55 mm of clearance
+# instead of the usual 75, the descent drooped 13 mm short, and the jaws closed
+# on the plate's rim. The IK was exact and no joint was near a limit -- the arm
+# simply could not hold itself down that far out.
+GRASP_CLEARANCE = 0.035
+
 
 def robustly_shared(world_xyz, *, clearance: float = POUR_CLEARANCE,
                     slack: float = POUR_SLACK) -> bool:
@@ -493,6 +504,8 @@ def sample_scene(seed: int) -> SceneSpec:
         for _ in range(200):
             p = _sample_in_region(rng, region, z=z)
             if not clear_of_cabinet(p):
+                continue
+            if not reaching_arms(p, clearance=GRASP_CLEARANCE):
                 continue
             if kind is not None and not _slot_clear_of(
                     p, kind, {n: goals[n] for n in avoid_goals}, scales):
@@ -699,7 +712,8 @@ def _sample_drawer(rng, *, gz: dict, scales: dict, goals: dict | None = None,
         contents = [np.array([x - 0.032, contents_y, in_drawer["spoon"]]),
                     np.array([x + 0.032, contents_y, in_drawer["fork"]])]
         if (all(can_reach(k, "A", TOP_DOWN) for k in travel)
-                and all(can_reach(c, "A", TOP_DOWN) for c in contents)):
+                and all(can_reach(c, "A", TOP_DOWN, GRASP_CLEARANCE)
+                        for c in contents)):
             return x, contents_y
     raise RuntimeError("could not place the drawer within arm A's workspace")
 
@@ -744,7 +758,7 @@ def _slot_clear_of(goal, kind: str, obstacles: dict, scales: dict,
     return True
 
 
-def _sample_place_setting(rng, *, gz: dict, tries: int = 300) -> dict:
+def _sample_place_setting(rng, *, gz: dict, tries: int = 1500) -> dict:
     """Lay out the place setting around a mug slot inside the shared lens.
 
     Anchoring on the mug rather than the plate is a big speed-up: the mug slot is
@@ -763,7 +777,8 @@ def _sample_place_setting(rng, *, gz: dict, tries: int = 300) -> dict:
         # arm steadying the mug while the other tips the bottle over it.
         if not robustly_shared(np.asarray(base["mug"])):
             continue
-        if not all(reaching_arms(np.asarray(g)) for g in base.values()):
+        if not all(reaching_arms(np.asarray(g), clearance=GRASP_CLEARANCE)
+                   for g in base.values()):
             continue
         # The cutlery slots must be reachable by the SAME arm that owns the
         # drawer, so a fork goes drawer -> slot in one arm without a transfer.
@@ -781,7 +796,8 @@ def _sample_place_setting(rng, *, gz: dict, tries: int = 300) -> dict:
             for name, (dx, dy) in layout.items():
                 goals[name] = (float(plate_goal[0] + dx), float(plate_goal[1] + dy),
                                gz[name])
-            if not all(can_reach(np.asarray(goals[n]), DRAWER_ARM, TOP_DOWN)
+            if not all(can_reach(np.asarray(goals[n]), DRAWER_ARM, TOP_DOWN,
+                                 GRASP_CLEARANCE)
                        for n in ("fork", "spoon")):
                 continue
             return goals
@@ -801,11 +817,11 @@ def validate_scene(spec: SceneSpec) -> None:
         p = (np.array([o.pos[0], o.pos[1],
                        DRAWER_FLOOR_TOP + OBJECT_HALF_H[o.kind] * o.scale])
              if o.inside_drawer else o.grasp_point)
-        if not reaching_arms(p):
+        if not reaching_arms(p, clearance=GRASP_CLEARANCE):
             problems.append(f"{o.name} at {np.round(p, 3)} is unreachable")
     knob_x = spec.by_name("spoon").pos[0] + 0.032
     for name, g in spec.goals.items():
-        if not reaching_arms(np.asarray(g)):
+        if not reaching_arms(np.asarray(g), clearance=GRASP_CLEARANCE):
             problems.append(f"goal for {name} at {np.round(g, 3)} is unreachable")
         if name == "mug" and not robustly_shared(np.asarray(g)):
             problems.append(f"mug slot at {np.round(g, 3)} has no pouring margin")
