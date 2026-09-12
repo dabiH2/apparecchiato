@@ -86,9 +86,57 @@ def _feasible_arms(node: Node, wps: list[np.ndarray]) -> list[str]:
     return sorted(common)
 
 
+def _reserve_the_lens_for_handoffs(graph: TaskGraph) -> None:
+    """Make every `place` wait for every `handoff`.
+
+    The shared lens -- the only region both arms reach -- is about 200 x 90 mm,
+    and a finished place setting is 190 mm wide. Measured on all ten evaluation
+    seeds: once the fork, spoon and mug are in their slots, there is nowhere left
+    in the lens to set an object down for a transfer, and the search for one
+    falls back to a spot that is already occupied. The symptom was the taker's
+    pad meeting a fork at -0.19 mm and stalling its descent 13 mm above a plate
+    that had been set down perfectly.
+
+    Nothing about the task requires the setting to be laid before the transfer,
+    so the transfer goes first and the lens is empty when it needs to be. This
+    is a resource constraint, and it belongs here rather than in a planner: it is
+    true of every plan, including ones the VLM writes, and the scheduler is where
+    the other two shared-workspace rules already live.
+    """
+    handoffs = [n.id for n in graph.nodes if n.skill == "handoff"]
+    if not handoffs:
+        return
+    by_id = {n.id: n for n in graph.nodes}
+
+    # Everything the hand-offs already wait on, transitively. Those must not be
+    # made to wait on the hand-off in turn -- that is a deadlock, and it is the
+    # one this produced on the first attempt: both arms ended up holding objects
+    # whose places were waiting for a transfer that could no longer start.
+    protected: set[str] = set(handoffs)
+    stack = list(handoffs)
+    while stack:
+        cur = by_id.get(stack.pop())
+        if cur is None:
+            continue
+        for d in cur.deps:
+            if d not in protected:
+                protected.add(d)
+                stack.append(d)
+
+    # Gate the PICKS, not just the places. Gating places alone leaves both arms
+    # holding something with nowhere to put it.
+    for n in graph.nodes:
+        if n.id in protected or n.skill not in ("pick", "place"):
+            continue
+        for h in handoffs:
+            if h not in n.deps:
+                n.deps.append(h)
+
+
 def schedule(graph: TaskGraph, scene: SceneSpec) -> list[Step]:
     """Assign arms and an execution order. Raises SchedulingError if infeasible."""
     from .sim.layout import drawer_content_pos
+    _reserve_the_lens_for_handoffs(graph)
     world = {o.name: (drawer_content_pos(scene, o.name) if o.inside_drawer
                       else o.grasp_point.copy()) for o in scene.objects}
 

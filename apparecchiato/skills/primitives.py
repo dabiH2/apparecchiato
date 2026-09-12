@@ -22,6 +22,7 @@ from ..kinematics import (
 )
 from ..sim.layout import (
     to_arm_frame, DRAWER_OPEN_TRAVEL, drawer_knob_pos, pick_pos, PARK_Q,
+    free_transfer_point,
 )
 
 GRIPPER_OPEN = 0.035      # jaw separation, metres
@@ -406,9 +407,12 @@ def handoff(giver: str, taker: str, scene, obj: str, world: dict | None = None) 
     # then the taker picks it up. The transfer is still what the scheduler
     # decided was necessary, and it is still both arms cooperating on one object
     # neither could handle alone; only the mechanism is table-mediated.
-    rendezvous = np.asarray(scene.handoff_point, dtype=float)
-    transfer = rendezvous.copy()
-    transfer[2] = float(o.grasp_point[2])      # resting height, not mid-air
+    # And WHERE on the table is decided here, not at scene time: the seed's
+    # handoff_point is a guess made before anything moved, and by now some slots
+    # are occupied. On three of ten seeds the guess was on top of the fork that
+    # had just been laid there -- the plate came to rest on the fork's shaft,
+    # 16 mm up and tilted, and arm B closed on nothing.
+    transfer = free_transfer_point(scene, world, obj)
 
     # The giver is already holding the object, so its roll is fixed: the one it
     # picked with. Carrying to the transfer point turns the object with the base

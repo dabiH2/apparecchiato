@@ -46,10 +46,15 @@ CAB_KEEPOUT_FRONT = 0.045    # how far in front of the shut knob to stay clear
 # reach that (x, y) at the object's own resting height AND at the standoff
 # height they approach and retreat through.
 TRANSFER_STANDOFF_Z = 0.050
-# Clearance the transfer point keeps from the goal slots and the bottle, on top
-# of both radii. Smaller than a slot's own margin: see _slot_clear_of. 8 mm is
-# what puts a pad beside the plate without touching its neighbour.
-TRANSFER_MARGIN = 0.008
+# Clearance the transfer point keeps from anything else on the table, on top of
+# both footprint radii. Smaller than a slot's own margin (see _slot_clear_of),
+# but not arbitrary: it is what the OPEN jaws sweep. Each pad sits 17.5 mm from
+# the tool axis and is 4 mm thick, so its outer face is at 21.5 mm, and the pad
+# is 20 mm long across that, putting the corner at sqrt(21.5^2 + 10^2) = 23.7 mm.
+# At 8 mm the arithmetic came out 3 mm short of that and the taker's pad met a
+# fork at -0.19 mm, stalling the descent 13 mm high over a plate that had been
+# set down perfectly. 14 mm clears the corner with 3 mm to spare.
+TRANSFER_MARGIN = 0.014
 
 DRAWER_FLOOR_TOP = 0.014     # world z of the drawer's inner floor (see sim.scene)
 
@@ -104,6 +109,30 @@ OBJECT_RADIUS = {      # half-width across the axis the jaws close on
     "bottle": 0.014,
     "spoon": 0.008,
     "fork": 0.008,
+}
+
+# Half-length of the cutlery. It was 30 mm, which made a 60 mm fork the longest
+# object on a table whose side plate is 26 mm across -- out of proportion with
+# real cutlery, and out of proportion with the space available: with the fork's
+# true footprint accounted for, no transfer point could be placed in the shared
+# lens at all, on any of 40 seeds. At 20 mm it is proportionate to the plate and
+# the lens has room again.
+CUTLERY_HALF_LEN = 0.020
+
+# What the object COVERS on the table, as opposed to what the jaws close on.
+# For the round things those are the same number. For a fork they are not: the
+# jaws close across a 16 mm shaft, but the fork is 60 mm long, and using the
+# grip half-width as its footprint is how the transfer point ended up 29 mm from
+# a fork's centre -- which is on top of the fork. Arm A set the plate down on
+# the fork's shaft, the plate came to rest 16 mm up and tilted, and arm B closed
+# on nothing. Three of ten seeds, all reported as "arm B did not receive the
+# plate".
+OBJECT_FOOTPRINT_R = {
+    "plate": 0.013,
+    "mug": 0.014,
+    "bottle": 0.014,
+    "spoon": CUTLERY_HALF_LEN + 0.002,
+    "fork": CUTLERY_HALF_LEN + 0.002,
 }
 
 # The grasp height IS the half-height, by construction. Kept as its own name
@@ -542,18 +571,30 @@ def sample_scene(seed: int) -> SceneSpec:
     # plate and mug SPAWNS are deliberately not obstacles here: both have been
     # picked up by the time anything is transferred, and the cutlery is still in
     # the drawer.
+    #
+    # Slot-clear is a PREFERENCE here, not a requirement, and that is a measured
+    # decision: once the cutlery's real footprint is accounted for, 26 of 40
+    # seeds have nowhere in the lens that is both reachable by two arms and clear
+    # of a full place setting. The lens is roughly 200 x 90 mm and the setting is
+    # 190 mm wide. What saves it is that the setting is not THERE yet when the
+    # hand-off happens -- so skills.handoff re-picks the point at motion-build
+    # time against the live world (see free_transfer_point), and this is only the
+    # starting guess it searches outward from.
     transfer_obstacles = dict(goals)
     transfer_obstacles["bottle"] = tuple(bottle_p)
     z_lo, z_hi = min(gz.values()), max(gz.values())
     handoff_point = None
-    for _ in range(600):
-        cand = sample_clear(_SHARED, z_lo)
-        if not _slot_clear_of(cand, "plate", transfer_obstacles, scales,
-                              margin=TRANSFER_MARGIN):
-            continue
-        if all(in_shared_workspace([cand[0], cand[1], z])
-               for z in (z_hi, TRANSFER_STANDOFF_Z)):
-            handoff_point = cand
+    for require_clear in (True, False):
+        for _ in range(600):
+            cand = sample_clear(_SHARED, z_lo)
+            if require_clear and not _slot_clear_of(
+                    cand, "plate", transfer_obstacles, scales, margin=TRANSFER_MARGIN):
+                continue
+            if all(in_shared_workspace([cand[0], cand[1], z])
+                   for z in (z_hi, TRANSFER_STANDOFF_Z)):
+                handoff_point = cand
+                break
+        if handoff_point is not None:
             break
     if handoff_point is None:
         raise RuntimeError("could not place a transfer point reachable at every grasp height")
@@ -676,9 +717,9 @@ def _slot_clear_of(goal, kind: str, obstacles: dict, scales: dict,
     straight back up, and the shared lens is not big enough to hold both the
     setting and a full slot's worth of clearance.
     """
-    r_slot = OBJECT_RADIUS[kind] * scales.get(kind, 1.0)
+    r_slot = OBJECT_FOOTPRINT_R[kind] * scales.get(kind, 1.0)
     for name, p in obstacles.items():
-        need = r_slot + OBJECT_RADIUS[name] * scales.get(name, 1.0) + margin
+        need = r_slot + OBJECT_FOOTPRINT_R[name] * scales.get(name, 1.0) + margin
         if float(np.linalg.norm(np.asarray(goal)[:2] - np.asarray(p)[:2])) < need:
             return False
     return True
@@ -767,12 +808,16 @@ def validate_scene(spec: SceneSpec) -> None:
         if others and not _slot_clear_of(a.pos, a.kind, others, scales):
             problems.append(f"{a.name} at {np.round(a.grasp_point, 3)} is crowded "
                             f"by another object")
-    obstructing = dict(spec.goals)
-    obstructing["bottle"] = spec.by_name("bottle").pos
-    if not _slot_clear_of(spec.handoff_point, "plate", obstructing, scales,
+    # The hand-off point is NOT asserted clear of the slots. It cannot be -- see
+    # the note in sample_scene -- and it does not need to be, because
+    # free_transfer_point re-picks it against the live world before the motion is
+    # built. What must hold is that the bottle, which stands there all episode,
+    # is not on it.
+    if not _slot_clear_of(spec.handoff_point, "plate",
+                          {"bottle": spec.by_name("bottle").pos}, scales,
                           margin=TRANSFER_MARGIN):
         problems.append(
-            f"hand-off point {np.round(spec.handoff_point, 3)} is on top of a slot or the bottle")
+            f"hand-off point {np.round(spec.handoff_point, 3)} is on top of the bottle")
     for o in spec.objects:
         if o.inside_drawer:
             continue
@@ -785,6 +830,49 @@ def validate_scene(spec: SceneSpec) -> None:
             break
     if problems:
         raise ValueError("infeasible scene seed %d:\n  - %s" % (spec.seed, "\n  - ".join(problems)))
+
+
+def free_transfer_point(spec: SceneSpec, world: dict | None, obj: str,
+                        *, margin: float = TRANSFER_MARGIN) -> np.ndarray:
+    """Where to actually put `obj` down for a hand-off, given the live table.
+
+    The seed's `handoff_point` is a guess made before anything has moved. By the
+    time a hand-off runs, some slots are full and some are not, and which ones
+    depends on the plan -- which the sampler cannot know. Rather than constrain
+    the sampler against a worst case that leaves the shared lens empty (26 of 40
+    seeds, measured), the point is re-chosen here from what is on the table NOW,
+    spiralling outward from the seed's guess and taking the first spot that is
+    reachable by both arms at the object's own height and at standoff height.
+
+    Falls back to the seed's point if the spiral finds nothing, so a hand-off
+    that has nowhere good to go still fails at execution, visibly, rather than
+    refusing to build.
+    """
+    o = spec.by_name(obj)
+    z = float(o.grasp_point[2])
+    scales = {x.kind: x.scale for x in spec.objects}
+    obstacles = {}
+    for x in spec.objects:
+        if x.name == obj:
+            continue
+        obstacles[x.kind] = np.asarray((world or {}).get(x.name, x.pos), dtype=float)
+
+    base = np.asarray(spec.handoff_point, dtype=float)
+    candidates = [base[:2]]
+    for r in (0.012, 0.024, 0.036, 0.048, 0.060, 0.075):
+        for k in range(12):
+            a = 2.0 * math.pi * k / 12.0
+            candidates.append(base[:2] + np.array([r * math.cos(a), r * math.sin(a)]))
+    for xy in candidates:
+        p = np.array([float(xy[0]), float(xy[1]), z])
+        if not _slot_clear_of(p, o.kind, obstacles, scales, margin=margin):
+            continue
+        if not in_shared_workspace(p):
+            continue
+        if not in_shared_workspace([p[0], p[1], TRANSFER_STANDOFF_Z]):
+            continue
+        return p
+    return np.array([base[0], base[1], z])
 
 
 def drawer_knob_pos(spec: SceneSpec) -> np.ndarray:

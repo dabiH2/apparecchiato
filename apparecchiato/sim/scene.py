@@ -23,6 +23,7 @@ from .layout import (
     SceneSpec, ARM_A_BASE, ARM_B_BASE, ARM_MOUNT_YAW, DRAWER_CLOSED_Y,
     DRAWER_OPEN_TRAVEL, DRAWER_KNOB_Z, TABLE_HALF_X, TABLE_Y_MIN, TABLE_Y_MAX,
     DRAWER_FLOOR_TOP, OBJECT_HALF_H, OBJECT_TOP_H, OBJECT_RADIUS,
+    CUTLERY_HALF_LEN,
 )
 
 GRIPPER_TRAVEL = 0.036
@@ -195,11 +196,18 @@ def _object(parent, o):
         # 18 mm thick rather than 6: the pads grip the shaft's EDGE, so the
         # contact patch is exactly as tall as the shaft, and a taller patch is
         # what stops the fork rotating and sliding out of the jaws mid-carry.
+        #
+        # Shaft and head are derived from CUTLERY_HALF_LEN so the piece really
+        # is that long end to end. They were not, and the head sat at y = 38 mm
+        # with its own 16 mm half-width on top -- a 108 mm fork described in the
+        # clearance checks as an 8 mm disc.
         sh = 0.009 * s
-        _e(body, "geom", type="box", size=[OBJECT_RADIUS[o.kind] * s, 0.030 * s, sh],
+        head = CUTLERY_HALF_LEN * 0.35 * s
+        shaft = CUTLERY_HALF_LEN * 0.65 * s
+        _e(body, "geom", type="box", size=[OBJECT_RADIUS[o.kind] * s, shaft, sh],
            pos=at(sh), mass=o.mass * 0.6, **common)
-        _e(body, "geom", type="box", size=[0.016 * s, 0.016 * s, sh],
-           pos=[0, 0.038 * s, 0], mass=o.mass * 0.4, **common)
+        _e(body, "geom", type="box", size=[head, head, sh],
+           pos=[0, CUTLERY_HALF_LEN * s - head, 0], mass=o.mass * 0.4, **common)
 
 
 def _drawer(parent, spec: SceneSpec, knob_x: float):
