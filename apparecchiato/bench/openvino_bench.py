@@ -78,7 +78,10 @@ class BenchReport:
         lines += ["", "| Device | Precision | p50 latency (ms) | p95 (ms) | Throughput (inf/s) "
                   "| First infer (ms) | Status |", "| --- | --- | --- | --- | --- | --- | --- |"]
         for r in self.results:
-            status = "ok" if r.ok else f"failed: {r.error[:60]}"
+            # Errors are worth reading, not truncating to a shrug: a failed
+            # device/precision pair is a fact about the silicon and the only way
+            # to tell "this NPU will not take bf16" from "the shapes were wrong".
+            status = "ok" if r.ok else f"failed: {' '.join(r.error.split())[:160]}"
             lines.append(
                 f"| {r.device} | {r.precision} | {r.latency_ms_p50:.2f} | {r.latency_ms_p95:.2f} "
                 f"| {r.throughput_fps:.1f} | {r.first_infer_ms:.1f} | {status} |")
@@ -139,6 +142,28 @@ def describe_devices() -> tuple[str, list, dict]:
 
 # --- benchmark -------------------------------------------------------------
 
+def _dummy_inputs(compiled) -> dict:
+    """Plausible input tensors of the right dtype for every port.
+
+    Dtype matters, not just shape: this model's text ports are int64 token ids,
+    and handing them float32 noise either throws or silently benchmarks a
+    conversion that the real pipeline never performs. Integer ports get small
+    non-negative values -- valid token ids and a mask of ones -- rather than
+    arbitrary integers that could index out of an embedding table.
+    """
+    feed = {}
+    for port in compiled.inputs:
+        shape = [d.get_length() if d.is_static else 1 for d in port.partial_shape]
+        dtype = np.dtype(port.element_type.to_dtype())
+        if np.issubdtype(dtype, np.integer):
+            feed[port] = np.ones(shape, dtype=dtype)
+        elif dtype == np.bool_:
+            feed[port] = np.ones(shape, dtype=np.bool_)
+        else:
+            feed[port] = np.random.rand(*shape).astype(dtype)
+    return feed
+
+
 def _bench_one(core, model, device: str, precision: str, iterations: int,
                warmup: int) -> DeviceResult:
     res = DeviceResult(device=device, precision=precision, ok=False)
@@ -149,10 +174,7 @@ def _bench_one(core, model, device: str, precision: str, iterations: int,
         compiled = core.compile_model(model, device, cfg)
         req = compiled.create_infer_request()
 
-        feed = {}
-        for port in compiled.inputs:
-            shape = [d.get_length() if d.is_static else 1 for d in port.partial_shape]
-            feed[port] = np.random.rand(*shape).astype(np.float32)
+        feed = _dummy_inputs(compiled)
 
         t0 = time.perf_counter()
         req.infer(feed)
@@ -177,9 +199,17 @@ def _bench_one(core, model, device: str, precision: str, iterations: int,
     return res
 
 
-def benchmark(model_path: str, *, devices=None, precisions=("native", "f16", "i8"),
-              iterations: int = 60, warmup: int = 8) -> BenchReport:
-    """Sweep devices x precisions for one OpenVINO IR model."""
+def benchmark(model_path: str, *, devices=None, precisions=("native", "f32", "f16", "bf16"),
+              iterations: int = 60, warmup: int = 8, shapes: dict | None = None) -> BenchReport:
+    """Sweep devices x precisions for one OpenVINO IR model.
+
+    `shapes` pins the input shapes before compiling. This is not optional in
+    practice: `torch.export` leaves the detector's ports fully dynamic ([?,?]),
+    so a benchmark that guesses 1 for every unknown dimension feeds the model a
+    1x1 image and measures nothing -- which is exactly what happened, as a wall
+    of failed inferences. Pinning is also what deployment looks like, since the
+    NPU plugin wants static shapes.
+    """
     import openvino as ov                                      # noqa: PLC0415
 
     cpu = _cpu_name()
@@ -198,6 +228,20 @@ def benchmark(model_path: str, *, devices=None, precisions=("native", "f16", "i8
 
     core = ov.Core()
     model = core.read_model(model_path)
+    dynamic = [p.any_name for p in model.inputs if p.partial_shape.is_dynamic]
+    if shapes:
+        try:
+            model.reshape({k: ov.PartialShape(list(v)) for k, v in shapes.items()})
+            report.notes.append(
+                "input shapes pinned to " +
+                ", ".join(f"{k}={tuple(v)}" for k, v in shapes.items()))
+        except Exception as exc:                               # noqa: BLE001
+            report.notes.append(f"could not pin input shapes: {exc}")
+    elif dynamic:
+        report.notes.append(
+            f"WARNING: dynamic input shapes {dynamic} and none were pinned -- "
+            "every unknown dimension defaults to 1, so these numbers describe a "
+            "degenerate input, not the real workload")
     targets = list(devices) if devices else [d for d in available if d != "AUTO"]
     if not targets:
         report.notes.append("OpenVINO reported no devices")

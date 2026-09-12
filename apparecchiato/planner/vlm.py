@@ -33,7 +33,7 @@ class VLMPlanner(Planner):
     name = "vlm"
 
     def __init__(self, backend: str | None = None, model: str | None = None,
-                 device: str | None = None, max_new_tokens: int = 512,
+                 device: str | None = None, max_new_tokens: int = 768,
                  temperature: float = 0.0, max_attempts: int = 2):
         self.backend = backend or os.environ.get("APPARECCHIATO_VLM_BACKEND", "auto")
         self.model = model or DEFAULT_OV_MODEL
@@ -48,6 +48,7 @@ class VLMPlanner(Planner):
         self.last_raw: str | None = None
         self.last_repaired: bool = False
         self.last_dropped: int = 0
+        self.last_truncated: bool = False
 
     # -- public -------------------------------------------------------------
 
@@ -88,6 +89,9 @@ class VLMPlanner(Planner):
             # different quality claim from one that parsed as emitted, and the
             # benchmark reports the two separately.
             notes.append("model JSON needed syntax repair before parsing")
+        if self.last_truncated:
+            notes.append("model output was cut off at the token limit; "
+                         "complete nodes were salvaged")
         if self.last_dropped:
             notes.append(f"{self.last_dropped} node(s) were unparseable and dropped")
         if attempt:
@@ -204,11 +208,26 @@ class VLMPlanner(Planner):
     # -- parsing ------------------------------------------------------------
 
     def _parse(self, raw: str) -> list[Node]:
-        blob = _extract_json_object(raw)
-        if blob is None:
-            raise PlannerError(f"no JSON object in model output: {raw[:240]!r}")
         self.last_repaired = False
         self.last_dropped = 0
+        self.last_truncated = False
+
+        blob = _extract_json_object(raw)
+        if blob is None:
+            # No balanced object at all almost always means the answer was cut
+            # off at the token limit rather than malformed -- the text starts
+            # '{"nodes": [{"id": "n0", ...' and simply never closes. The nodes
+            # that DID finish are perfectly good, so salvage those rather than
+            # throwing the answer away and paying for another generation.
+            text = re.sub(r"```(?:json)?", "", raw or "")
+            nodes_raw, dropped = _salvage_nodes(_repair_json(text))
+            if not nodes_raw:
+                raise PlannerError(f"no JSON object in model output: {raw[:240]!r}")
+            self.last_repaired = True
+            self.last_truncated = True
+            self.last_dropped = dropped
+            return self._to_nodes({"nodes": nodes_raw})
+
         try:
             data = json.loads(blob)
         except json.JSONDecodeError:
@@ -239,6 +258,9 @@ class VLMPlanner(Planner):
                 data = {"nodes": nodes_raw}
                 self.last_dropped = dropped
             self.last_repaired = True
+        return self._to_nodes(data)
+
+    def _to_nodes(self, data: dict) -> list[Node]:
         if "nodes" not in data or not isinstance(data["nodes"], list):
             raise PlannerError("model output has no 'nodes' list")
         if not data["nodes"]:

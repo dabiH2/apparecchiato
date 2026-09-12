@@ -53,6 +53,10 @@ Rules:
 - A handoff sits between a pick and a place when the two need different arms.
 - pour requires the destination to already be placed and both arms free.
 - deps must reference ids you have already defined. No cycles.
+- An arm holds ONE object at a time. Between picking something and picking the
+  next thing, that arm must place or hand off what it is holding.
+- Keep each rationale to six words or fewer. A long answer gets cut off before
+  it is finished, and a cut-off plan is no plan.
 
 Worked example. Copy this shape exactly: every node has the same five keys, the
 object and target values are bare names in quotes, and the whole reply is one
