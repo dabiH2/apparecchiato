@@ -190,7 +190,7 @@ apparecchiato/
   eval/              multi-seed harness and report
 scripts/             run_episode, run_eval, diagnose, bench_openvino, verify_env, export_*, calibrate,
                      dayone.ps1 (one-command Windows setup)
-tests/               151 tests, none of which need MuJoCo
+tests/               190 tests, none of which need MuJoCo
 ```
 
 Everything that can be reasoned about without physics — kinematics, geometry, planning,
@@ -198,7 +198,7 @@ scheduling, skill construction — lives outside the simulator and is unit-teste
 `pytest` runs the whole suite in seconds on any machine.
 
 ```bash
-python -m pytest -q     # 151 passed
+python -m pytest -q     # 190 passed
 ```
 
 ---
