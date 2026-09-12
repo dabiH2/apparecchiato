@@ -133,6 +133,43 @@ def _reserve_the_lens_for_handoffs(graph: TaskGraph) -> None:
                 n.deps.append(h)
 
 
+def _pick_is_premature(node: Node, graph: TaskGraph, done: set[str]) -> bool:
+    """Would this pick leave an arm holding something it cannot yet put down?
+
+    Do not pick up what you cannot put down. A grasp is not a shelf: an object
+    held across other steps slides. Measured on seed 57, arm A picked the spoon,
+    then parked holding it while the other arm did three plate steps, and the
+    spoon crept 10 mm through the pads in the first of those and 63 mm by the
+    time it was placed -- a failed place for a grasp that had been perfect.
+
+    Holding got longer when the scheduler started reserving the shared lens for
+    hand-offs, so this is the other half of that change rather than a separate
+    idea. A pick waits until everything its own place needs -- other than the
+    pick/hand-off/place chain for that same object -- is finished.
+    """
+    obj = node.args.get("object")
+    if not obj:
+        return False
+    by_id = {n.id: n for n in graph.nodes}
+    chain = {n.id for n in graph.nodes if n.args.get("object") == obj}
+    places = [n for n in graph.nodes
+              if n.skill == "place" and n.args.get("object") == obj]
+    if not places:
+        return False
+    stack = [d for p in places for d in p.deps]
+    seen: set[str] = set()
+    while stack:
+        d = stack.pop()
+        if d in seen or d in chain or d in done:
+            continue
+        seen.add(d)
+        dep = by_id.get(d)
+        if dep is None:
+            continue
+        return True
+    return False
+
+
 def schedule(graph: TaskGraph, scene: SceneSpec) -> list[Step]:
     """Assign arms and an execution order. Raises SchedulingError if infeasible."""
     from .sim.layout import drawer_content_pos
@@ -154,22 +191,43 @@ def schedule(graph: TaskGraph, scene: SceneSpec) -> list[Step]:
             raise SchedulingError(
                 f"deadlock: {sorted(remaining)} are all waiting on unfinished dependencies"
             )
-        ready.sort(key=lambda n: topo.index(n.id))
+        # Put down what is already in a hand before starting anything else.
+        # Topological order alone let arm A pick the spoon and then wait three
+        # steps for its turn: the spoon crept 10 mm through the pads in the
+        # first of those and 63 mm by the time it was placed -- a failed place
+        # for a grasp that had been perfect. A gripper is not a shelf.
+        def _frees_a_hand(n: Node) -> bool:
+            obj = n.args.get("object")
+            return (n.skill in ("place", "handoff") and obj is not None
+                    and obj in holding.values())
+
+        ready.sort(key=lambda n: (0 if _frees_a_hand(n) else 1, topo.index(n.id)))
 
         # Take the first ready node whose grasp preconditions can be met right
         # now. A node that needs a busy arm is not an error -- it just waits for
         # a later round, once a place or hand-off has freed that arm.
+        # Two passes. The first skips picks that would leave an arm holding
+        # something it cannot yet put down; the second drops that preference, so
+        # a graph where every remaining node is such a pick still makes progress
+        # instead of deadlocking.
         chosen = None
         blocked: list[str] = []
-        for node in ready:
-            wps = node_waypoints(node, scene, world)
-            try:
-                arms = _assign(node, wps, holding, last_arm_finish)
-            except SchedulingError as exc:
-                blocked.append(f"{node.id}: {exc}")
-                continue
-            chosen = (node, arms, wps)
-            break
+        for defer_premature_picks in (True, False):
+            for node in ready:
+                if (defer_premature_picks and node.skill == "pick"
+                        and _pick_is_premature(node, graph, done)):
+                    continue
+                wps = node_waypoints(node, scene, world)
+                try:
+                    arms = _assign(node, wps, holding, last_arm_finish)
+                except SchedulingError as exc:
+                    if not defer_premature_picks:
+                        blocked.append(f"{node.id}: {exc}")
+                    continue
+                chosen = (node, arms, wps)
+                break
+            if chosen is not None:
+                break
 
         if chosen is None:
             raise SchedulingError(
