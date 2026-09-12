@@ -110,6 +110,17 @@ OBJECT_RADIUS = {      # half-width across the axis the jaws close on
 # because that is what the rest of the code asks for.
 GRASP_Z = dict(OBJECT_HALF_H)
 
+# The jaws open 35 mm (skills.primitives.GRIPPER_OPEN; the slide's own travel is
+# 36 mm). Descending PAST an object needs clearance a side, not just a width that
+# fits: at 1.5 mm the pads caught a plate's rim, and at 3.1 mm they still did.
+JAW_OPEN = 0.035
+DESCENT_CLEARANCE = 0.004
+
+
+def _max_scale(kind: str) -> float:
+    """Largest scale at which the open jaws still clear this object's widest part."""
+    return (JAW_OPEN - 2 * DESCENT_CLEARANCE) / (2 * OBJECT_RADIUS[kind])
+
 # Both arms are bolted to the near edge facing +y (toward the diner), so the
 # base-pan limits are measured about +y, not about the world +x axis. Everything
 # reachability-related goes through to_arm_frame(), which applies this.
@@ -358,10 +369,20 @@ def sample_scene(seed: int) -> SceneSpec:
     # Scale is drawn first because it sets the grasp height, and the grasp height
     # sets which radii are reachable -- sampling position against the unscaled
     # height would let a tall object land just outside the annulus.
-    scales = {k: float(rng.uniform(lo, hi)) for k, (lo, hi) in {
-        "plate": (0.88, 1.12), "mug": (0.90, 1.10), "bottle": (0.92, 1.08),
-        "spoon": (0.90, 1.10), "fork": (0.90, 1.10),
-    }.items()}
+    #
+    # The upper end of each range is CAPPED by what the hand can descend past.
+    # Randomising size is only honest if every size drawn is still pickable, and
+    # this one was not: the open jaws span 35 mm, so a 28.8 mm plate leaves
+    # 3.1 mm a side, the pads catch its rim on the way down, and the arm stalls
+    # 14 mm high and closes on the plate's top edge. Measured on seeds 4 and 5 --
+    # 28.8 mm and 27.9 mm both stalled, 26.9 mm did not. Deriving the cap from
+    # DESCENT_CLEARANCE rather than hand-tuning each range means a future change
+    # to a radius or to the gripper cannot quietly reintroduce it.
+    scales = {k: float(rng.uniform(lo, min(hi, _max_scale(k))))
+              for k, (lo, hi) in {
+                  "plate": (0.88, 1.12), "mug": (0.90, 1.10), "bottle": (0.92, 1.08),
+                  "spoon": (0.90, 1.10), "fork": (0.90, 1.10),
+              }.items()}
     gz = {k: GRASP_Z[k] * v for k, v in scales.items()}
 
     # The place setting is laid out FIRST, and everything else -- the cabinet

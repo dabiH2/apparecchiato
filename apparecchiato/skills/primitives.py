@@ -224,14 +224,40 @@ def _standoff(arm: str, target, h_pref: float, *, roll: float = 0.0, prefer=None
     )
 
 
+def turn_pose(arm: str, target, roll: float = 0.0) -> np.ndarray:
+    """The park pose, re-aimed at `target`: same tucked shape, new base heading.
+
+    This exists because waypoints are interpolated in JOINT space, and a joint-
+    space straight line between two very different configurations does not keep
+    the tool anywhere sensible in between. Going from park straight to a pose
+    above a plate on the far side of the table swings the tool out through the
+    middle of the table and DIPS it: measured at the moment of failure, arm A's
+    tool was at z = 38 mm with both fingers 5 mm inside the cabinet, on its way
+    to a plate it never reached. Three of ten seeds ended there.
+
+    Turning first fixes it geometrically rather than by luck. Park keeps the
+    tool 96 mm from the base, inside BASE_KEEPOUT where nothing is allowed to
+    stand, and at that radius the swing stays at y <= 0.096 -- in front of the
+    cabinet, which starts at y = 0.14. So the arm pans while tucked, and only
+    then extends radially outward, which is a motion in one vertical plane.
+    """
+    q = np.asarray(PARK_Q[arm], dtype=float).copy()
+    q[0] = base_pan(arm, target)
+    q[4] = roll
+    return q
+
+
 def _grasp_sequence(arm: str, target, *, label: str, roll: float = 0.0,
                     prefer=None, release: bool = False,
                     grip: float = GRIPPER_CLOSED) -> list[Waypoint]:
-    """Approach from above, close (or open) the jaws, retreat straight up.
+    """Turn, approach from above, close (or open) the jaws, retreat, tuck back.
 
     Used by pick, place and both halves of a hand-off, so the approach geometry
     is identical everywhere and a grasp that works in one skill works in all.
     """
+    turn = turn_pose(arm, target, roll)
+    if prefer is None:
+        prefer = turn
     pre = _standoff(arm, target, APPROACH_H, roll=roll, prefer=prefer, what=f"pre-{label}")
     at = _ik_world(target, arm, roll=roll, prefer=pre, what=label)
     post = _standoff(arm, target, LIFT_H, roll=roll, prefer=at, what=f"lift-{label}")
@@ -243,11 +269,18 @@ def _grasp_sequence(arm: str, target, *, label: str, roll: float = 0.0,
         # where it is. Descending or closing from a pose it has not reached yet
         # is how the gripper ends up swiping an object off the table and then
         # closing on empty air.
+        Waypoint(arm, turn, hold_before, f"{label}:turn", steps=40, dwell=0.15),
         Waypoint(arm, pre, hold_before, f"{label}:approach", steps=45, dwell=SETTLE),
         Waypoint(arm, at, hold_before, f"{label}:descend", steps=30, dwell=SETTLE),
         Waypoint(arm, at, hold_after, f"{label}:{'release' if release else 'grasp'}",
                  dwell=0.45, steps=2),
         Waypoint(arm, post, hold_after, f"{label}:retreat", steps=30, dwell=0.2),
+        # Tuck straight back in along the same heading before anything pans. The
+        # outward trip is only safe because it happens in one vertical plane;
+        # the return trip has to as well, or the arm sweeps back across the
+        # table at carry height with the object still in the jaws.
+        Waypoint(arm, turn_pose(arm, target, roll), hold_after,
+                 f"{label}:withdraw", steps=40, dwell=0.1),
     ]
 
 
@@ -280,12 +313,16 @@ def open_drawer(arm: str, scene) -> Motion:
                       what="clear of drawer")
 
     return Motion("open_drawer", [
+        Waypoint(arm, turn_pose(arm, shut, KNOB_ROLL), GRIPPER_OPEN,
+                 "drawer:turn", steps=40, dwell=0.15),
         Waypoint(arm, pre, GRIPPER_OPEN, "drawer:approach", steps=45),
         Waypoint(arm, at, GRIPPER_OPEN, "drawer:descend", steps=25),
         Waypoint(arm, at, KNOB_GRIP, "drawer:grasp-knob", dwell=0.3, steps=2),
         *pull,
         Waypoint(arm, prev, GRIPPER_OPEN, "drawer:release-knob", dwell=0.2, steps=2),
         Waypoint(arm, clear, GRIPPER_OPEN, "drawer:clear", steps=25),
+        Waypoint(arm, turn_pose(arm, opened, KNOB_ROLL), GRIPPER_OPEN,
+                 "drawer:withdraw", steps=40),
     ], notes=[f"pulled {DRAWER_OPEN_TRAVEL * 100:.0f} cm in 5 IK-checked increments"])
 
 
@@ -386,16 +423,28 @@ def handoff(giver: str, taker: str, scene, obj: str, world: dict | None = None) 
         # Giver: carry in, set down, let go, and get completely clear. The retreat
         # to HOME matters -- withdrawing only to a standoff leaves the giver's
         # forearm exactly where the taker needs to be.
+        # Turn while tucked, then extend: a joint-space line from park to a pose
+        # above the transfer point dips the tool through the middle of the table
+        # (see turn_pose). Carrying the payload round at park radius is safe --
+        # nothing may stand inside BASE_KEEPOUT.
+        Waypoint(giver, turn_pose(giver, transfer, g_roll), grip,
+                 "handoff:giver-turn", steps=45, dwell=0.15),
         Waypoint(giver, g_pre, grip, "handoff:carry-in", steps=130),
         Waypoint(giver, g_at, grip, "handoff:set-down", steps=28),
         Waypoint(giver, g_at, GRIPPER_OPEN, "handoff:release", dwell=0.35, steps=2),
         Waypoint(giver, g_away, GRIPPER_OPEN, "handoff:giver-lift", steps=25),
+        Waypoint(giver, turn_pose(giver, transfer, g_roll), GRIPPER_OPEN,
+                 "handoff:giver-withdraw", steps=40),
         Waypoint(giver, g_home, GRIPPER_OPEN, "handoff:giver-clear", steps=45),
         # Taker: only now does the second arm move in.
+        Waypoint(taker, turn_pose(taker, transfer, t_roll), GRIPPER_OPEN,
+                 "handoff:taker-turn", steps=40, dwell=0.15),
         Waypoint(taker, t_pre, GRIPPER_OPEN, "handoff:taker-approach", steps=50),
         Waypoint(taker, t_at, GRIPPER_OPEN, "handoff:taker-descend", steps=28),
         Waypoint(taker, t_at, grip, "handoff:taker-grasp", dwell=0.4, steps=2),
         Waypoint(taker, t_away, grip, "handoff:taker-lift", steps=30),
+        Waypoint(taker, turn_pose(taker, transfer, t_roll), grip,
+                 "handoff:taker-withdraw", steps=40),
     ], notes=[f"table-mediated transfer at {np.round(transfer, 3).tolist()} "
               f"in the shared lens (in-air hand-off self-collides on this arm)"])
 
@@ -425,9 +474,16 @@ def pour(steady_arm: str, pour_arm: str, scene, source: str, into: str,
     b_down = _ik_world(bottle, pour_arm, prefer=b_back, what="set bottle down")
 
     return Motion("pour", [
+        # Both arms turn while tucked before extending -- same reason as
+        # everywhere else (see turn_pose). The bottle's own trip out and back
+        # stays on one heading throughout, so it needs no extra turn.
+        Waypoint(steady_arm, turn_pose(steady_arm, mug), GRIPPER_OPEN,
+                 "pour:steady-turn", steps=40, dwell=0.15),
         Waypoint(steady_arm, s_pre, GRIPPER_OPEN, "pour:steady-approach", steps=45),
         Waypoint(steady_arm, s_at, GRIPPER_OPEN, "pour:steady-descend", steps=25),
         Waypoint(steady_arm, s_at, GRIPPER_CLOSED, "pour:steady-hold", dwell=0.3, steps=2),
+        Waypoint(pour_arm, turn_pose(pour_arm, bottle), GRIPPER_OPEN,
+                 "pour:bottle-turn", steps=40, dwell=0.15),
         Waypoint(pour_arm, b_pre, GRIPPER_OPEN, "pour:bottle-approach", steps=45),
         Waypoint(pour_arm, b_at, GRIPPER_OPEN, "pour:bottle-descend", steps=25),
         Waypoint(pour_arm, b_at, GRIPPER_CLOSED, "pour:bottle-grasp", dwell=0.3, steps=2),
@@ -439,8 +495,12 @@ def pour(steady_arm: str, pour_arm: str, scene, source: str, into: str,
         Waypoint(pour_arm, b_down, GRIPPER_CLOSED, "pour:set-down", steps=25),
         Waypoint(pour_arm, b_down, GRIPPER_OPEN, "pour:bottle-release", dwell=0.2, steps=2),
         Waypoint(pour_arm, b_up, GRIPPER_OPEN, "pour:bottle-clear", steps=25),
+        Waypoint(pour_arm, turn_pose(pour_arm, bottle), GRIPPER_OPEN,
+                 "pour:bottle-withdraw", steps=40),
         Waypoint(steady_arm, s_at, GRIPPER_OPEN, "pour:steady-release", dwell=0.2, steps=2),
         Waypoint(steady_arm, s_pre, GRIPPER_OPEN, "pour:steady-clear", steps=25),
+        Waypoint(steady_arm, turn_pose(steady_arm, mug), GRIPPER_OPEN,
+                 "pour:steady-withdraw", steps=40),
     ])
 
 
