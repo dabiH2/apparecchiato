@@ -156,6 +156,12 @@ def main() -> int:
     ap.add_argument("--keep-going", action="store_true",
                     help="continue past a failing step instead of stopping")
     ap.add_argument("--quiet", action="store_true", help="only print failures")
+    ap.add_argument("--objects", action="store_true",
+                    help="print every object's position after each step, and how "
+                         "far it has drifted from where the planner believes it "
+                         "is -- the fastest way to spot an object being carried, "
+                         "knocked or left behind by something other than the step "
+                         "that was supposed to move it")
     ap.add_argument("--track", action="store_true",
                     help="print the manipulated object's pose and its offset from "
                          "the grasp site at every waypoint -- this is how you tell "
@@ -225,8 +231,11 @@ def main() -> int:
                 extra = ""
                 if target is not None:
                     extra = f" site->target={np.linalg.norm(site - target) * 1000:6.1f}mm"
-                if st.node.skill == "open_drawer":
-                    extra += f" drawer={env.drawer_open() * 1000:5.1f}mm"
+                # The drawer is shown on EVERY step, not just the one that opens
+                # it. It is a shared piece of the world that any arm can knock,
+                # and when it shut during an unrelated step it broke the two
+                # steps after that instead of the one that hit it.
+                extra += f" drawer={env.drawer_open() * 1000:5.1f}mm"
                 if args.track and probe_obj:
                     # Object pose AND its offset from the site that is supposed to
                     # be carrying it. A constant offset means a clean carry; a
@@ -267,6 +276,15 @@ def main() -> int:
                 return 1
         elif run_this and not args.quiet:
             print(f"    ok: {detail}")
+        if args.objects and run_this:
+            print(f"    -- objects after step {st.order} --")
+            for o in env.spec.objects:
+                now = env.object_pos(o.name)
+                believed = np.asarray(world.get(o.name, now), dtype=float)
+                drift = float(np.linalg.norm(now - believed)) * 1000.0
+                print(f"       {o.name:7s} {np.round(now, 4)}"
+                      f"  believed {np.round(believed, 4)}  drift {drift:5.1f} mm")
+            print(f"       drawer open {env.drawer_open() * 1000:.1f} mm")
         _update_world(env, st, world)
 
     env.close()

@@ -104,6 +104,41 @@ ARMS = {"A": ARM_A_BASE, "B": ARM_B_BASE}
 # GOAL slots have to be reachable by this same arm -- see _sample_place_setting.
 DRAWER_ARM = "A"
 
+# Where an idle arm goes to be out of the way. NOT the home pose: at HOME an
+# arm's tool sits at y = 0.253, which is inside the cabinet, so parking arm A
+# there drove the gripper into the open drawer and shut it -- 44.9 mm back to
+# 3.0 mm -- carrying the spoon in with it and failing both steps that needed the
+# spoon afterwards. One contact, three failed steps, none of them at the bug.
+#
+# Three things had to be true at once, and two of them were learned the hard way:
+#
+#   1. A TUCK, not a retreat. Optimising for distance from everything picked a
+#      fully extended pose 450 mm out; an arm that unfolds across the table to
+#      park sweeps a huge arc, and it flung the fork 509 mm and launched the
+#      plate off the table.
+#   2. The tool must keep pointing DOWN. An arm parks while still holding
+#      something and the grip is a friction pinch, so tilt puts gravity along
+#      the pads. At 70 deg off vertical the fork slid out; at 35 deg -- which
+#      the arithmetic said was fine for a 30 g fork -- the mug still slipped,
+#      because a smooth cylinder has nothing to catch on.
+#   3. Clear of the furniture. But the arm CANNOT hold the tool top-down above
+#      z = 0.10 at all (measured: the workspace ends there), and the cabinet
+#      walls reach z = 0.08, so "top-down and above the furniture" has no
+#      solution.
+#
+# What resolves it: park inside the arm's own BASE_KEEPOUT radius. Nothing may
+# spawn there -- no object, no goal slot -- and the cabinet's nearest corner is
+# 185 mm away, so the space is guaranteed empty by construction. Emptiness does
+# the job that height could not.
+#
+# Result: tool 96 mm from its own base at z = 0.097, pitch 0, pan 0 -- straight
+# out in front of each arm, so the move to park is short as well as safe.
+# scripts/find_park_pose.py derives these and can be re-run if the furniture moves.
+PARK_Q = {
+    "A": np.array([0.0000, -0.3163, 1.6778, 1.7801, 0.0000]),  # tool [-0.12, 0.096, 0.097]
+    "B": np.array([0.0000, -0.3163, 1.6778, 1.7801, 0.0000]),  # tool [ 0.12, 0.096, 0.097]
+}
+
 
 # --- reachability ----------------------------------------------------------
 
@@ -316,37 +351,66 @@ def sample_scene(seed: int) -> SceneSpec:
     # the plate first and the cabinet afterwards let them overlap: on seed 0 the
     # plate spawned 13 mm inside the cabinet, which both wedges the drawer and
     # makes the plate impossible to pick.
-    drawer_x, open_y = _sample_drawer(rng, gz=gz)
+    drawer_x, open_y = _sample_drawer(rng, gz=gz, scales=scales)
 
     def clear_of_cabinet(p) -> bool:
         return not (abs(float(p[0]) - drawer_x) < CAB_KEEPOUT_X
                     and float(p[1]) > DRAWER_CLOSED_Y - CAB_KEEPOUT_FRONT)
 
-    def sample_clear(region, z):
-        for _ in range(80):
-            p = _sample_in_region(rng, region, z=z)
-            if clear_of_cabinet(p):
-                return p
-        raise RuntimeError(f"could not place an object in {region!r} clear of the cabinet")
+    # The place setting is laid out FIRST, and the objects are then kept off it.
+    # The other order does not work: the setting has to live in the shared lens
+    # (both arms must reach the mug slot, for the pour) and the lens is small, so
+    # constraining the setting to dodge three already-placed objects rejects
+    # every candidate. Constraining the objects to dodge four fixed points is
+    # easy, because the regions they spawn in are large.
+    goals = _sample_place_setting(rng, gz=gz)
 
-    plate_p = sample_clear(_A_ONLY, gz["plate"])
-    mug_p = sample_clear(_B_ONLY, gz["mug"])
-    # The bottle sits in the shared lens on purpose: pouring is a complementary
-    # dual-arm action, so whichever arm is not steadying the mug has to be able
-    # to lift it. A bottle only one arm could reach would make the pour
-    # impossible whenever that same arm owned the mug slot.
-    # Keep the bottle clear of the mug, but bounded: the shared lens is small, so
-    # an unbounded "resample until far enough" loop can spin forever on seeds
-    # where the mug happens to sit in the middle of it. Take the best of a fixed
-    # number of draws instead -- always terminates, still well separated.
+    def sample_clear(region, z, kind=None, avoid_goals=()):
+        for _ in range(200):
+            p = _sample_in_region(rng, region, z=z)
+            if not clear_of_cabinet(p):
+                continue
+            if kind is None or _slot_clear_of(
+                    p, kind, {n: goals[n] for n in avoid_goals}, scales):
+                return p
+        raise RuntimeError(
+            f"could not place an object in {region!r} clear of the cabinet and slots")
+
+    # An object must not spawn on a slot that something ELSE has to be placed
+    # into -- including its own slot's neighbours. Its own slot is exempt: it is
+    # about to be picked up and moved there anyway.
+    plate_p = sample_clear(_A_ONLY, gz["plate"], "plate", ("mug", "fork", "spoon"))
+    mug_p = sample_clear(_B_ONLY, gz["mug"], "mug", ("plate", "fork", "spoon"))
+    # The bottle must be clear of EVERY goal slot, and for the bottle that is
+    # non-negotiable: it is the one object that is never put away. It is poured
+    # from and set back down, so wherever it spawns it stands there for the whole
+    # episode. On seed 0 it spawned on the fork's slot; arm A carried the fork
+    # straight into it, shoved the bottle into the drawer, the drawer shut on the
+    # spoon, and four later steps failed -- none of them at the overlap.
+    #
+    # It does NOT have to be in the shared lens, which is what the earlier
+    # version required and which leaves nowhere to put it: the setting already
+    # fills the lens. One arm reaching it is enough, because the MUG slot is
+    # shared, so whichever arm cannot reach the bottle can always be the one
+    # steadying the mug. The lens is preferred only because it gives the
+    # scheduler a free choice of which arm pours.
     bottle_p, best = None, -1.0
-    for _ in range(60):
-        cand = sample_clear(_SHARED, gz["bottle"])
-        d = float(np.linalg.norm(cand[:2] - mug_p[:2]))
-        if d > best:
-            bottle_p, best = cand, d
-        if d >= 0.09:
+    for region in (_SHARED, _A_ONLY, _B_ONLY):
+        for _ in range(40):
+            try:
+                cand = sample_clear(region, gz["bottle"], "bottle",
+                                    ("plate", "mug", "fork", "spoon"))
+            except RuntimeError:
+                break
+            d = float(np.linalg.norm(cand[:2] - mug_p[:2]))
+            if d > best:
+                bottle_p, best = cand, d
+            if d >= 0.09:
+                break
+        if bottle_p is not None and best >= 0.09:
             break
+    if bottle_p is None:
+        raise RuntimeError("could not place the bottle clear of the place setting")
 
     objects = [
         ObjectSpec("plate", "plate", tuple(plate_p), yaw=float(rng.uniform(-0.4, 0.4)),
@@ -375,7 +439,6 @@ def sample_scene(seed: int) -> SceneSpec:
     # lens so either arm can complete it; cutlery flanks it. The whole setting is
     # accepted only if every slot is reachable by at least one arm, so a seed can
     # never fail for a reason the policy had no way to handle.
-    goals = _sample_place_setting(rng, gz=gz)
     # The transfer point is on the TABLE, because a mid-air hand-off self-collides
     # on this arm (see skills.handoff). It must therefore be reachable by both
     # arms across the whole range of grasp heights an object might be transferred
@@ -439,17 +502,27 @@ def _wall_tone(rng) -> tuple:
     return (r, g, b, 1.0)
 
 
-def _sample_drawer(rng, *, gz: dict, tries: int = 400) -> tuple[float, float]:
+def _sample_drawer(rng, *, gz: dict, scales: dict, tries: int = 400) -> tuple[float, float]:
     """Drawer x such that arm A can pull the knob through its whole travel and
-    then reach the cutlery inside, checking intermediate positions too."""
+    then reach the cutlery inside, checking intermediate positions too.
+
+    The cutlery is checked at its height INSIDE THE DRAWER, not at the height it
+    would rest at on the table. Those differ by the drawer floor -- 14 mm -- and
+    the top-down annulus shrinks with height, so validating at table height
+    accepts drawer positions the arm cannot actually reach into. Measured: the
+    spoon at [-0.111, 0.234] passed the check at z=0.009 and then failed at
+    execution with "no clearance above pre-pick-spoon" at z=0.022.
+    """
     open_y = DRAWER_CLOSED_Y - DRAWER_OPEN_TRAVEL
     for _ in range(tries):
         x = float(rng.uniform(-0.17, -0.07))
         travel = [np.array([x, y, DRAWER_KNOB_Z])
                   for y in np.linspace(DRAWER_CLOSED_Y, open_y, 6)]
         contents_y = open_y + DRAWER_CONTENT_OFFSET_Y
-        contents = [np.array([x - 0.032, contents_y, gz["spoon"]]),
-                    np.array([x + 0.032, contents_y, gz["fork"]])]
+        in_drawer = {k: DRAWER_FLOOR_TOP + OBJECT_HALF_H[k] * scales[k]
+                     for k in ("spoon", "fork")}
+        contents = [np.array([x - 0.032, contents_y, in_drawer["spoon"]]),
+                    np.array([x + 0.032, contents_y, in_drawer["fork"]])]
         if (all(can_reach(k, "A", TOP_DOWN) for k in travel)
                 and all(can_reach(c, "A", TOP_DOWN) for c in contents)):
             return x, contents_y
@@ -472,6 +545,21 @@ _CUTLERY_LAYOUTS = (
     {"fork": (0.055, 0.000), "spoon": (0.095, 0.000)},     # both right
     {"fork": (-0.072, -0.055), "spoon": (-0.072, 0.055)},  # stacked to the left
 )
+
+
+def _slot_clear_of(goal, kind: str, obstacles: dict, scales: dict) -> bool:
+    """Is this goal slot far enough from everything already on the table?
+
+    "Far enough" is both radii plus a gripper-pad margin: the jaws have to get
+    down beside the object being placed, so touching is not the threshold --
+    having room for 8 mm of finger on the near side is.
+    """
+    r_slot = OBJECT_RADIUS[kind] * scales.get(kind, 1.0)
+    for name, p in obstacles.items():
+        need = r_slot + OBJECT_RADIUS[name] * scales.get(name, 1.0) + 0.030
+        if float(np.linalg.norm(np.asarray(goal)[:2] - np.asarray(p)[:2])) < need:
+            return False
+    return True
 
 
 def _sample_place_setting(rng, *, gz: dict, tries: int = 300) -> dict:
@@ -521,8 +609,17 @@ def validate_scene(spec: SceneSpec) -> None:
     """Fail loudly at sample time rather than mysteriously mid-episode."""
     problems = []
     for o in spec.objects:
-        if not reaching_arms(o.grasp_point):
-            problems.append(f"{o.name} at {np.round(o.grasp_point, 3)} is unreachable")
+        # Cutlery is checked where it will be WHEN IT IS PICKED: drawer open
+        # (ObjectSpec.pos already is that position) and resting on the drawer
+        # floor, 14 mm above the table. Both halves matter. Checking it with the
+        # drawer shut fails every seed, since that is the whole reason the drawer
+        # gets opened; checking it at table height passes seeds the arm cannot
+        # actually reach into, because the top-down annulus shrinks with height.
+        p = (np.array([o.pos[0], o.pos[1],
+                       DRAWER_FLOOR_TOP + OBJECT_HALF_H[o.kind] * o.scale])
+             if o.inside_drawer else o.grasp_point)
+        if not reaching_arms(p):
+            problems.append(f"{o.name} at {np.round(p, 3)} is unreachable")
     for name, g in spec.goals.items():
         if not reaching_arms(np.asarray(g)):
             problems.append(f"goal for {name} at {np.round(g, 3)} is unreachable")

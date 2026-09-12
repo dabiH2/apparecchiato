@@ -35,7 +35,10 @@ def main() -> int:
     ap.add_argument("--arm", default="",
                     help="arm whose grasp site to measure from; default: the "
                          "arm of the current waypoint")
-    ap.add_argument("--object", required=True)
+    ap.add_argument("--object", default="")
+    ap.add_argument("--watch-drawer", action="store_true",
+                    help="instead of an object, report the first tick the drawer "
+                         "moves on its own, and everything touching it then")
     ap.add_argument("--tol", type=float, default=0.010)
     args = ap.parse_args()
 
@@ -51,6 +54,7 @@ def main() -> int:
     grip = {"A": GRIPPER_OPEN, "B": GRIPPER_OPEN}
     m, d = env.model, env.data
     armed = [False]    # only report a LOSS, i.e. after the object was in the jaws
+    baseline = [None]  # how far open the drawer has ever been, for --watch-drawer
 
     def bname(gid):
         return mujoco.mj_id2name(m, mujoco.mjtObj.mjOBJ_BODY, m.geom_bodyid[gid]) or "?"
@@ -68,6 +72,35 @@ def main() -> int:
             env.step()
             tick += 1
             if not watch or fired:
+                continue
+            if args.watch_drawer:
+                # The drawer is shared world state that no step owns. When it
+                # closes during an unrelated step it breaks the steps AFTER it,
+                # so the useful question is which body pushed it, and when.
+                opened = env.drawer_open()
+                if baseline[0] is None:
+                    baseline[0] = opened
+                # 1.5 mm, not 4: by the time the drawer has moved 4 mm the body
+                # that shoved it has usually separated again, and the contact
+                # list shows only the aftermath.
+                if baseline[0] - opened <= 0.0015:
+                    baseline[0] = max(baseline[0], opened)
+                    continue
+                fired = True
+                print(f"step {st.order} '{label}' tick {tick}: drawer went "
+                      f"{baseline[0] * 1000:.1f} -> {opened * 1000:.1f} mm")
+                print("  contacts on the drawer or cabinet:")
+                found = False
+                for c in range(d.ncon):
+                    con = d.contact[c]
+                    b1, b2 = bname(con.geom1), bname(con.geom2)
+                    if ("drawer" in (b1, b2) or "cabinet" in (b1, b2)
+                            or "arm" in b1 or "arm" in b2):
+                        found = True
+                        print(f"    {b1:22s} <-> {b2:22s} "
+                              f"dist={float(con.dist) * 1000:+6.2f} mm")
+                if not found:
+                    print("    NOTHING is touching it -- the drawer moved on its own")
                 continue
             probe_arm = args.arm or arm
             off = float(np.linalg.norm(env.grasp_site(probe_arm)

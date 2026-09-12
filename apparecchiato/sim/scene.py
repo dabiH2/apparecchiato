@@ -205,8 +205,18 @@ def _drawer(parent, spec: SceneSpec, knob_x: float):
     # Sized against what the arm can actually deliver: the shoulder/elbow
     # actuators are capped at 12 N, so a drawer that needs more than a few
     # newtons to move simply never opens.
+    # frictionloss is what makes an open drawer STAY open. At 0.25 N it behaved
+    # like a frictionless slide: during the plate hand-off an arm brushed the
+    # drawer front and shut it from 44.9 mm back to 3.7 mm, dragging the spoon
+    # with it -- which then failed the spoon pick ("no clearance", because the
+    # spoon was back inside a closed cabinet) and the spoon place after it. One
+    # contact, three failed steps, none of them where the bug was.
+    #
+    # 1.2 N is still well inside what the arm delivers through the knob (the
+    # shoulder actuators are capped at 12-30 N), and it is what a real drawer
+    # does: they have stiction, and they do not swing shut when you touch them.
     _e(dr, "joint", name="drawer_slide", type="slide", axis=[0, -1, 0],
-       range=[0, DRAWER_OPEN_TRAVEL], damping=3.0, frictionloss=0.25)
+       range=[0, DRAWER_OPEN_TRAVEL], damping=6.0, frictionloss=1.2)
     _e(dr, "geom", type="box", size=[0.072, 0.068, 0.003], pos=[0, 0, 0],
        rgba=[0.55, 0.44, 0.32, 1], mass=0.30)
     # Low front panel: the knob has to stand proud of the drawer or the fingers

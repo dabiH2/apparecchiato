@@ -21,7 +21,7 @@ from ..kinematics import (
     HOME_Q, TOP_DOWN, JOINT_LIMITS, solve_ik, interpolate, fk,
 )
 from ..sim.layout import (
-    to_arm_frame, DRAWER_OPEN_TRAVEL, drawer_knob_pos, pick_pos,
+    to_arm_frame, DRAWER_OPEN_TRAVEL, drawer_knob_pos, pick_pos, PARK_Q,
 )
 
 GRIPPER_OPEN = 0.035      # jaw separation, metres
@@ -372,7 +372,10 @@ def handoff(giver: str, taker: str, scene, obj: str, world: dict | None = None) 
     g_at = _ik_world(transfer, giver, roll=g_roll, prefer=g_pre, what="transfer point (giver)")
     g_away = _standoff(giver, transfer, LIFT_H, roll=g_roll, prefer=g_at,
                        what="giver retreat")
-    g_home = HOME_Q.copy()                     # fully out of the taker's way
+    # Fully out of the taker's way -- and out of the cabinet's way. HOME puts the
+    # tool at y = 0.253, inside the cabinet, so retreating there shut the drawer.
+    g_home = np.asarray(PARK_Q[giver], dtype=float).copy()
+    g_home[4] = g_roll                         # never twist the payload
 
     t_pre = _standoff(taker, transfer, APPROACH_H, roll=t_roll, what="taker pre-transfer")
     t_at = _ik_world(transfer, taker, roll=t_roll, prefer=t_pre, what="transfer point (taker)")
@@ -464,10 +467,10 @@ def park_idle(active: tuple[str, ...] | set[str], hold: dict, grip: dict,
     for a in ("A", "B"):
         if a in active:
             continue
-        # Park the ARM, not the payload: HOME_Q has wrist_roll = 0, and driving
+        # Park the ARM, not the payload: PARK_Q has wrist_roll = 0, and driving
         # the roll to zero while holding a fork twists it between the pads until
         # it walks out. Keep whatever roll the arm is carrying.
-        q = np.asarray(HOME_Q, dtype=float).copy()
+        q = np.asarray(PARK_Q[a], dtype=float).copy()
         q[4] = float(np.asarray(hold[a], dtype=float)[4])
         if np.allclose(hold[a], q, atol=tol):
             continue
