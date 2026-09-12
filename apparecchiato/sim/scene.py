@@ -344,14 +344,22 @@ def build_mjcf(spec: SceneSpec, *, timestep: float = 0.002) -> str:
     # kp is therefore chosen so the holding error stays under ~0.005 rad, and
     # dampratio=1 critically damps each joint so the stiffer gains do not ring.
     # forcerange stays realistic for SO-101 class servos (~3 Nm).
+    #
+    # The gains were doubled again after the last failures turned out to be the
+    # same effect at a longer lever. At full extension -- 211 mm from the base,
+    # near the edge of the annulus -- the tool arrived 14 mm high and the jaws
+    # closed on a plate's rim, with the IK exact, no joint near a limit and
+    # nothing in contact. It was simply sag, and the descent's settle was not
+    # long enough to work it out. Doubling kp brings the same grasp to 2.3 mm.
+    # forcerange is untouched: this is a stiffer controller, not a stronger arm.
     act = _e(root, "actuator")
     for arm in ("armA", "armB"):
         for j, kp, fmax, lim in (
-            ("shoulder_pan", 150, 30, JOINT_LIMITS[0]),
-            ("shoulder_lift", 300, 30, JOINT_LIMITS[1]),
-            ("elbow_flex", 220, 25, JOINT_LIMITS[2]),
-            ("wrist_flex", 120, 15, JOINT_LIMITS[3]),
-            ("wrist_roll", 60, 10, JOINT_LIMITS[4]),
+            ("shoulder_pan", 300, 30, JOINT_LIMITS[0]),
+            ("shoulder_lift", 700, 30, JOINT_LIMITS[1]),
+            ("elbow_flex", 500, 25, JOINT_LIMITS[2]),
+            ("wrist_flex", 260, 15, JOINT_LIMITS[3]),
+            ("wrist_roll", 120, 10, JOINT_LIMITS[4]),
         ):
             _e(act, "position", name=f"{arm}_{j}", joint=f"{arm}_{j}", kp=kp,
                dampratio=1.0, ctrlrange=lim, forcerange=[-fmax, fmax])

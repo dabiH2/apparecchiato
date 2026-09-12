@@ -618,8 +618,9 @@ def sample_scene(seed: int) -> SceneSpec:
             if require_clear and not _slot_clear_of(
                     cand, "plate", transfer_obstacles, scales, margin=TRANSFER_MARGIN):
                 continue
-            if all(in_shared_workspace([cand[0], cand[1], z])
-                   for z in (z_hi, TRANSFER_STANDOFF_Z)):
+            if (in_shared_workspace([cand[0], cand[1], z_hi],
+                                    clearance=GRASP_CLEARANCE)
+                    and in_shared_workspace([cand[0], cand[1], TRANSFER_STANDOFF_Z])):
                 handoff_point = cand
                 break
         if handoff_point is not None:
@@ -831,7 +832,8 @@ def validate_scene(spec: SceneSpec) -> None:
         if (abs(float(g[0]) - knob_x) < CAB_KEEPOUT_X
                 and float(g[1]) > DRAWER_CLOSED_Y - CAB_KEEPOUT_FRONT):
             problems.append(f"goal for {name} at {np.round(g, 3)} is inside the cabinet")
-    if not in_shared_workspace(np.asarray(spec.handoff_point)):
+    if not in_shared_workspace(np.asarray(spec.handoff_point),
+                               clearance=GRASP_CLEARANCE):
         problems.append(
             f"hand-off point {np.round(spec.handoff_point, 3)} is not reachable by both arms")
     scales = {o.kind: o.scale for o in spec.objects}
@@ -902,7 +904,11 @@ def free_transfer_point(spec: SceneSpec, world: dict | None, obj: str,
         p = np.array([float(xy[0]), float(xy[1]), z])
         if not _slot_clear_of(p, o.kind, obstacles, scales, margin=margin):
             continue
-        if not in_shared_workspace(p):
+        # GRASP_CLEARANCE, not the default: the transfer point is grasped from,
+        # so it needs the same standoff margin an object's own spawn does. It did
+        # not have it, and on seed 82 the taker's descent drooped 13.9 mm short
+        # over a plate that had been set down within 1 mm of the target.
+        if not in_shared_workspace(p, clearance=GRASP_CLEARANCE):
             continue
         if not in_shared_workspace([p[0], p[1], TRANSFER_STANDOFF_Z]):
             continue
