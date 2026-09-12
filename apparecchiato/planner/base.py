@@ -53,6 +53,21 @@ Rules:
 - A handoff sits between a pick and a place when the two need different arms.
 - pour requires the destination to already be placed and both arms free.
 - deps must reference ids you have already defined. No cycles.
+
+Worked example. Copy this shape exactly: every node has the same five keys, the
+object and target values are bare names in quotes, and the whole reply is one
+JSON object with no text before or after it.
+
+Observation: plate reachable by A, plate slot reachable by B.
+
+{"nodes": [
+  {"id": "n0", "skill": "pick", "args": {"object": "plate"}, "arm": "A",
+   "deps": [], "rationale": "only arm A reaches the plate"},
+  {"id": "n1", "skill": "handoff", "args": {"object": "plate"}, "arm": "any",
+   "deps": ["n0"], "rationale": "the slot is out of arm A's reach"},
+  {"id": "n2", "skill": "place", "args": {"object": "plate", "target": "plate"},
+   "arm": "B", "deps": ["n1"], "rationale": "arm B reaches the slot"}
+]}
 """
 
 
