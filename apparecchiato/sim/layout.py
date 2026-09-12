@@ -38,8 +38,23 @@ DRAWER_KNOB_Z = 0.055
 DRAWER_CONTENT_OFFSET_Y = 0.050   # cutlery sits this far behind the knob
 
 # Keep-out box around the drawer cabinet: nothing else may spawn here.
-CAB_KEEPOUT_X = 0.105        # cabinet half-width plus clearance
-CAB_KEEPOUT_FRONT = 0.045    # how far in front of the shut knob to stay clear
+#
+# Both numbers are the cabinet's own half-extent PLUS the radius the open jaws
+# sweep (23.7 mm -- see TRANSFER_MARGIN), because the keep-out has to leave room
+# for the gripper beside whatever stands at its edge, not just for the object.
+# The front number was exactly DRAWER_OPEN_TRAVEL, so an object could stand
+# flush against the open drawer: on seeds 3 and 9 the bottle did, arm A's finger
+# went 0.5 mm into the drawer front while descending onto it during the pour,
+# and shoved the drawer from 45.4 mm back to 43.3 mm. Both seeds finished every
+# other subgoal and failed only on `drawer_open`.
+#
+# Only the FRONT carries the full gripper allowance. Widening the sides as well
+# pushed the drawer out of the band of x where arm A can pull it through its
+# whole travel, and 16 of 40 seeds could then place no drawer at all. The sides
+# are also the cheaper risk: an arm reaching past the cabinet is moving along
+# the keep-out, while an arm descending in front of it is moving into it.
+CAB_KEEPOUT_X = 0.105                  # cabinet half-width plus clearance
+CAB_KEEPOUT_FRONT = 0.045 + 0.028      # open-drawer travel plus a swept gripper
 
 # Hand-offs are table-mediated: the giver sets the object down at the transfer
 # point and retreats, then the taker picks it up. Both arms therefore have to
@@ -667,7 +682,11 @@ def _sample_drawer(rng, *, gz: dict, scales: dict, goals: dict | None = None,
     """
     open_y = DRAWER_CLOSED_Y - DRAWER_OPEN_TRAVEL
     for _ in range(tries):
-        x = float(rng.uniform(-0.17, -0.07))
+        # The lower end is not a guess: the knob-travel and cutlery reachability
+        # checks below reject anything arm A cannot actually work, so widening
+        # the draw only gives the sampler more room to dodge the place setting,
+        # whose keep-out grew when the cabinet's front clearance did.
+        x = float(rng.uniform(-0.20, -0.07))
         if goals and any(abs(float(g[0]) - x) < CAB_KEEPOUT_X
                          and float(g[1]) > DRAWER_CLOSED_Y - CAB_KEEPOUT_FRONT
                          for g in goals.values()):
