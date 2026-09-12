@@ -1,0 +1,8 @@
+# Normalise line endings so a Windows checkout and a Linux CI runner see the
+# same bytes -- and so git stops warning about CRLF on every single add, which
+# PowerShell treats as an error stream and which killed scripts/push.ps1.
+* text=auto eol=lf
+*.ps1 text eol=crlf
+*.png binary
+*.jpg binary
+*.mp4 binary
