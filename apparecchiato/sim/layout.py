@@ -400,13 +400,43 @@ def sample_scene(seed: int) -> SceneSpec:
         light_pos=(float(rng.uniform(-0.5, 0.5)), float(rng.uniform(-0.1, 0.5)),
                    float(rng.uniform(0.9, 1.5))),
         light_intensity=float(rng.uniform(0.65, 1.35)),
-        table_rgba=(float(rng.uniform(0.35, 0.78)), float(rng.uniform(0.30, 0.62)),
-                    float(rng.uniform(0.24, 0.52)), 1.0),
-        wall_rgba=(float(rng.uniform(0.18, 0.62)), float(rng.uniform(0.18, 0.62)),
-                   float(rng.uniform(0.22, 0.68)), 1.0),
+        # A WOOD tone, not three independent channels. Drawing r, g and b
+        # separately can land on a near-grey tabletop, and a near-grey tabletop
+        # is the same colour class as a white plate and a steel fork -- the
+        # colour detector then segments the table and reports the plate a
+        # quarter of a metre from where it is. Deriving g and b from r keeps the
+        # table reliably warm and saturated, so it can never be confused with
+        # achromatic tableware, while still varying plenty.
+        table_rgba=_wood_tone(rng),
+        # Warm too, and for the same reason: the old wall could be a washed-out
+        # blue, which is the mug's hue at low saturation, and the detector
+        # segmented the backdrop instead of the cup. Randomising a scene is only
+        # useful if the randomisation cannot manufacture a decoy.
+        wall_rgba=_wall_tone(rng),
     )
     validate_scene(spec)
     return spec
+
+
+def _wood_tone(rng) -> tuple:
+    """A warm tabletop with guaranteed saturation of at least ~0.35.
+
+    Saturation in HSV is (max - min) / max; with b <= 0.62 * r that is at least
+    0.38 whatever r happens to be. That bound is the point: it is what keeps the
+    table out of the achromatic colour class the plate and cutlery live in.
+    """
+    r = float(rng.uniform(0.42, 0.74))
+    g = r * float(rng.uniform(0.58, 0.80))
+    b = r * float(rng.uniform(0.30, 0.62))
+    return (r, g, b, 1.0)
+
+
+def _wall_tone(rng) -> tuple:
+    """A warm, clearly-saturated backdrop -- never a washed-out blue or green."""
+    r = float(rng.uniform(0.28, 0.66))
+    g = r * float(rng.uniform(0.50, 0.78))
+    b = r * float(rng.uniform(0.28, 0.58))
+    return (r, g, b, 1.0)
 
 
 def _sample_drawer(rng, *, gz: dict, tries: int = 400) -> tuple[float, float]:

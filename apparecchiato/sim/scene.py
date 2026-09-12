@@ -60,8 +60,12 @@ def _arm(parent, name: str, base_xyz, mount_yaw: float, rgba):
     """One SO-101: 5 revolute joints plus a symmetric two-finger gripper."""
     body = _e(parent, "body", name=f"{name}_base", pos=base_xyz,
               euler=[0.0, 0.0, float(mount_yaw)])
+    # The base takes the arm's own colour, not a light grey. At [0.25,0.25,0.28]
+    # it was a large, bright, desaturated disc -- the same colour class as the
+    # white plate -- and the colour detector happily reported the plate sitting
+    # on top of a shoulder.
     _e(body, "geom", type="cylinder", size=[0.035, L_BASE_Z / 2],
-       pos=[0, 0, L_BASE_Z / 2], rgba=[0.25, 0.25, 0.28, 1], mass=0.4)
+       pos=[0, 0, L_BASE_Z / 2], rgba=rgba, mass=0.4)
 
     pan = _e(body, "body", name=f"{name}_pan", pos=[0, 0, L_BASE_Z])
     _e(pan, "joint", name=f"{name}_shoulder_pan", type="hinge", axis=[0, 0, 1],
@@ -228,6 +232,12 @@ def _drawer(parent, spec: SceneSpec, knob_x: float):
 def build_mjcf(spec: SceneSpec, *, timestep: float = 0.002) -> str:
     root = ET.Element("mujoco", model=f"apparecchiato_seed{spec.seed}")
     _e(root, "compiler", angle="radian", autolimits="true")
+    # Offscreen framebuffer big enough for a detector-sized render. MuJoCo's
+    # default is 640x480, and it refuses any larger render outright -- which
+    # matters because a 26 mm plate across a 680 mm field of view is under one
+    # 32 px patch at that size, so the detector has nothing to look at.
+    vis = _e(root, "visual")
+    _e(vis, "global", offwidth=1280, offheight=1280)
     _e(root, "option", timestep=timestep, integrator="implicitfast",
        cone="elliptic", impratio=10)
     _e(root, "size", njmax=4000, nconmax=1500)
@@ -265,8 +275,13 @@ def build_mjcf(spec: SceneSpec, *, timestep: float = 0.002) -> str:
     _e(world, "camera", name="cinematic", pos=[0.40, -0.34, 0.40],
        xyaxes=[0.64, 0.77, 0, -0.36, 0.30, 0.88], fovy=50)
 
-    _arm(world, "armA", ARM_A_BASE, ARM_MOUNT_YAW["A"], [0.30, 0.48, 0.78, 1])
-    _arm(world, "armB", ARM_B_BASE, ARM_MOUNT_YAW["B"], [0.82, 0.46, 0.24, 1])
+    # The arms are deliberately dark and desaturated, and deliberately NOT blue.
+    # Arm A used to be [0.30, 0.48, 0.78] -- 0.06 away from the mug's blue in RGB
+    # -- so a colour-segmenting detector locked onto the forearm instead of the
+    # mug and reported it 450 mm from where the mug actually was. A robot cell
+    # whose gripper is the same colour as the parts is a badly designed cell.
+    _arm(world, "armA", ARM_A_BASE, ARM_MOUNT_YAW["A"], [0.16, 0.17, 0.19, 1])
+    _arm(world, "armB", ARM_B_BASE, ARM_MOUNT_YAW["B"], [0.34, 0.16, 0.16, 1])
 
     _drawer(world, spec, knob_x=spec.by_name("spoon").pos[0] + 0.032)
     for o in spec.objects:
@@ -276,7 +291,12 @@ def build_mjcf(spec: SceneSpec, *, timestep: float = 0.002) -> str:
     # "success" means. contype/conaffinity 0 keeps them out of the physics.
     for name, g in spec.goals.items():
         _e(world, "site", name=f"goal_{name}", pos=[g[0], g[1], 0.002],
-           size=[0.022, 0.0005], type="cylinder", rgba=[0.2, 0.9, 0.4, 0.28])
+           # Violet, deliberately. These markers were green [0.2,0.9,0.4], whose
+           # hue is 0.381 -- the bottle's hue is 0.38. They are 44 mm across and
+           # the bottle is 28 mm, so the colour detector picked the marker every
+           # time and located the bottle at the goal slot it had not reached yet.
+           # A debug overlay must not be a decoy for the perception it sits under.
+           size=[0.022, 0.0005], type="cylinder", rgba=[0.72, 0.24, 0.85, 0.25])
     _e(world, "site", name="handoff_zone", pos=spec.handoff_point, size=0.018,
        rgba=[0.95, 0.85, 0.2, 0.20])
 

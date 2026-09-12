@@ -9,3 +9,6 @@ models/
 !assets/*.wav
 .DS_Store
 .pytest_cache/
+
+models/
+out/
