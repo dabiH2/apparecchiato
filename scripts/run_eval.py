@@ -36,6 +36,19 @@ def main() -> int:
     ap.add_argument("--no-video", action="store_true")
     ap.add_argument("--camera", default="cinematic")
     ap.add_argument("--max-seconds", type=float, default=180.0)
+    ap.add_argument("--detector", default=None,
+                    help="close the perception loop: 'colour' or 'openvino'. "
+                         "Without it, object positions come from simulator state "
+                         "and the run measures planning and control, not vision.")
+    ap.add_argument("--perception-camera", default="overhead")
+    ap.add_argument("--perceive", default=None,
+                    help="comma-separated objects perception is allowed to drive, "
+                         "e.g. 'bottle,mug'. Everything else keeps simulator "
+                         "state. Use it to report which objects the detector can "
+                         "actually place, instead of one pass/fail for all five.")
+    ap.add_argument("--no-markers", action="store_true",
+                    help="drop the goal-slot overlay -- for the hero shot, where "
+                         "the laid table should read without annotation")
     args = ap.parse_args()
 
     os.makedirs(args.out, exist_ok=True)
@@ -46,6 +59,11 @@ def main() -> int:
         record_dir=None if args.no_video else os.path.join(args.out, "video"),
         record_camera=None if args.no_video else args.camera,
         max_seconds=args.max_seconds,
+        markers=not args.no_markers,
+        detector_spec=args.detector,
+        perception_camera=args.perception_camera,
+        perceive_only=({s.strip() for s in args.perceive.split(",") if s.strip()}
+                       if args.perceive else None),
     )
     with open(os.path.join(args.out, "eval_report.json"), "w", encoding="utf-8") as fh:
         fh.write(summary.to_json())

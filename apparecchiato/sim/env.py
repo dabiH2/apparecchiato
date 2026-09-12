@@ -38,7 +38,8 @@ class TableEnv:
     """Dual SO-101 table-setting environment."""
 
     def __init__(self, spec: SceneSpec, *, mjcf: str | None = None,
-                 render_size: tuple[int, int] = (640, 480), substeps: int = 10):
+                 render_size: tuple[int, int] = (640, 480), substeps: int = 10,
+                 markers: bool = True):
         try:
             import mujoco                                    # noqa: PLC0415
         except ImportError as exc:                           # pragma: no cover
@@ -46,7 +47,7 @@ class TableEnv:
         self._mj = mujoco
         self.spec = spec
         self.substeps = substeps
-        xml = mjcf if mjcf is not None else build_mjcf(spec)
+        xml = mjcf if mjcf is not None else build_mjcf(spec, markers=markers)
         self.model = mujoco.MjModel.from_xml_string(xml)
         self.data = mujoco.MjData(self.model)
         self.width, self.height = render_size

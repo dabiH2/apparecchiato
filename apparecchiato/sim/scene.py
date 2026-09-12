@@ -259,7 +259,33 @@ def _drawer(parent, spec: SceneSpec, knob_x: float):
        condim=4, solimp=[0.97, 0.99, 0.001])
 
 
-def build_mjcf(spec: SceneSpec, *, timestep: float = 0.002) -> str:
+def _look_at(eye, target) -> list[float]:
+    """MJCF `xyaxes` for a camera at `eye` pointing at `target`.
+
+    Written out rather than hand-tuned because the cinematic framing WAS hand
+    tuned, and it put the table right-of-centre at about a third of the frame
+    with the rest unlit floor. Deriving it from a look-at means the shot is
+    stated as "point at this spot on the table", which is checkable.
+    """
+    eye = np.asarray(eye, dtype=float)
+    target = np.asarray(target, dtype=float)
+    forward = target - eye
+    forward /= np.linalg.norm(forward)
+    right = np.cross(forward, [0.0, 0.0, 1.0])
+    right /= np.linalg.norm(right)
+    up = np.cross(right, forward)
+    return [round(float(v), 4) for v in (*right, *up)]
+
+
+# The cinematic shot, as an eye and a point to look at rather than six numbers.
+# Slightly off-axis so both arms have depth, close enough that the table fills
+# the frame, and aimed just in front of the place setting.
+CINEMATIC_EYE = (0.30, -0.30, 0.34)
+CINEMATIC_TARGET = (-0.01, 0.15, 0.03)
+
+
+def build_mjcf(spec: SceneSpec, *, timestep: float = 0.002,
+               markers: bool = True) -> str:
     root = ET.Element("mujoco", model=f"apparecchiato_seed{spec.seed}")
     _e(root, "compiler", angle="radian", autolimits="true")
     # Offscreen framebuffer big enough for a detector-sized render. MuJoCo's
@@ -268,6 +294,13 @@ def build_mjcf(spec: SceneSpec, *, timestep: float = 0.002) -> str:
     # 32 px patch at that size, so the detector has nothing to look at.
     vis = _e(root, "visual")
     _e(vis, "global", offwidth=1280, offheight=1280)
+    # Lift the ambient floor. Watching the recorded episodes back, roughly 60% of
+    # every frame was unlit floor and backdrop, both arms read as near-black
+    # against slate, and the plate was effectively invisible. The physics did not
+    # care and the perception stack works off its own cameras, but a demo nobody
+    # can see is a demo that did not happen.
+    _e(vis, "headlight", ambient=[0.42, 0.42, 0.45], diffuse=[0.45, 0.45, 0.45],
+       specular=[0.1, 0.1, 0.1])
     _e(root, "option", timestep=timestep, integrator="implicitfast",
        cone="elliptic", impratio=10)
     _e(root, "size", njmax=4000, nconmax=1500)
@@ -302,8 +335,8 @@ def build_mjcf(spec: SceneSpec, *, timestep: float = 0.002) -> str:
     _e(world, "camera", name="front", pos=[0, -0.34, 0.30], xyaxes=[1, 0, 0, 0, 0.55, 0.84],
        fovy=55)
     _e(world, "camera", name="wrist_a", pos=[0, 0, 0], euler=[0, 0, 0], fovy=70)
-    _e(world, "camera", name="cinematic", pos=[0.40, -0.34, 0.40],
-       xyaxes=[0.64, 0.77, 0, -0.36, 0.30, 0.88], fovy=50)
+    _e(world, "camera", name="cinematic", pos=list(CINEMATIC_EYE),
+       xyaxes=_look_at(CINEMATIC_EYE, CINEMATIC_TARGET), fovy=46)
 
     # The arms are deliberately dark and desaturated, and deliberately NOT blue.
     # Arm A used to be [0.30, 0.48, 0.78] -- 0.06 away from the mug's blue in RGB
@@ -319,16 +352,22 @@ def build_mjcf(spec: SceneSpec, *, timestep: float = 0.002) -> str:
 
     # Visual-only markers for the place-setting slots, so a viewer can see what
     # "success" means. contype/conaffinity 0 keeps them out of the physics.
-    for name, g in spec.goals.items():
+    #
+    # `markers=False` drops them entirely. Watching the footage back, these were
+    # the MOST salient thing in the final frame -- a debug overlay outshining the
+    # laid table it was there to explain. They are dimmer now, and the hero shot
+    # turns them off: what the arms achieved should read without annotation.
+    for name, g in (spec.goals.items() if markers else ()):
         _e(world, "site", name=f"goal_{name}", pos=[g[0], g[1], 0.002],
            # Violet, deliberately. These markers were green [0.2,0.9,0.4], whose
            # hue is 0.381 -- the bottle's hue is 0.38. They are 44 mm across and
            # the bottle is 28 mm, so the colour detector picked the marker every
            # time and located the bottle at the goal slot it had not reached yet.
            # A debug overlay must not be a decoy for the perception it sits under.
-           size=[0.022, 0.0005], type="cylinder", rgba=[0.72, 0.24, 0.85, 0.25])
-    _e(world, "site", name="handoff_zone", pos=spec.handoff_point, size=0.018,
-       rgba=[0.95, 0.85, 0.2, 0.20])
+           size=[0.022, 0.0005], type="cylinder", rgba=[0.62, 0.30, 0.72, 0.13])
+    if markers:
+        _e(world, "site", name="handoff_zone", pos=spec.handoff_point, size=0.018,
+           rgba=[0.90, 0.82, 0.30, 0.11])
 
     # Actuator gains.
     #

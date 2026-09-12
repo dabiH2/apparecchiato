@@ -1,14 +1,31 @@
 # Apparecchiato
 
-**Bimanual VLA table setting on dual simulated SO-101 arms, deployed on Intel Core Ultra with OpenVINO.**
+**Bimanual table setting on dual simulated SO-101 arms, with a VLM planner exported to
+OpenVINO IR and a validator between the model and the robot.**
 
 Submission for the **Intel — Bimanual VLA Manipulation with Multi-Modal Reasoning** online
 track of the AI Infra Summit Hackathon (lablab.ai), plus the **Best Use of Speechmatics**
 bonus award.
 
 You say *"set the table and pour me some water."* Two SO-101 arms in MuJoCo work out
-between them who can reach what, hand the spoon across when neither arm can do the whole
+between them who can reach what, pass the plate across when neither arm can do the whole
 job alone, lay the setting, and pour.
+
+> **Read this before the numbers.** Three things are true and easy to miss, so they are
+> here rather than in a footnote.
+>
+> 1. **The VLM's plan is rejected on every seed.** Qwen2-VL-2B at INT4 is called, produces
+>    a plan, and the validator throws it out; the deterministic planner finishes the
+>    episode. The 100% figures are the fallback's. `results/eval_vlm_seeds0-9.md` names the
+>    executed planner per episode, and `docs/06-openvino-findings.md` measures why. That
+>    boundary *is* the project — a planner that fails does not stop the robot — but it
+>    means this is not a demonstration of a VLM driving a robot.
+> 2. **The headline numbers use simulator state for object positions, not perception.**
+>    Perception is measured separately and reported in `results/eval_perception*.md`.
+> 3. **The Intel figures were measured on an AMD Ryzen AI 9 HX 370**, because no Core
+>    Ultra hardware was available. The export path and the device/precision sweep are real
+>    and reproduce with one command on target hardware; the numbers are not from target
+>    hardware. The "GPU" row in the sweep is this machine's NVIDIA dGPU, not an Intel iGPU.
 
 ---
 
@@ -17,11 +34,11 @@ job alone, lay the setting, and pour.
 | Stage | What happens |
 | --- | --- |
 | **Hear** | Speechmatics real-time STT turns speech into an instruction (`--voice mic`). English or Italian. |
-| **Observe** | Overhead and front cameras. An open-vocabulary detector compiled to OpenVINO IR grounds the objects on the table plane. |
-| **Understand** | A vision-language model (OpenVINO IR, INT4, running on CPU / iGPU / NPU) reads the instruction and the scene and emits a task graph. |
-| **Plan** | The task graph is validated against physics, then scheduled across two arms: reachability, grasp state, and shared-workspace safety. |
+| **Observe** | Overhead and front cameras. Detectors compiled to OpenVINO IR ground objects on the table plane. Optional — `--detector colour` puts it in the loop and `results/eval_perception*.md` reports what that costs. Off by default, and the headline numbers say so. |
+| **Understand** | Qwen2-VL-2B, OpenVINO IR at INT4, reads the instruction and the scene and emits a task graph. On every seed so far that graph is rejected downstream. |
+| **Plan** | The task graph is validated against physics, then scheduled across two arms: reachability, grasp state, and shared-workspace safety. Rejected plans fall through to a deterministic planner, and the report names which one ran. |
 | **Act** | Skill primitives — `open_drawer`, `pick`, `place`, `handoff`, `pour` — drive both arms, verified after every step. |
-| **Report** | 10 randomised seeds, per-subgoal success rates, and an OpenVINO device/precision sweep. |
+| **Report** | 10 and 100 randomised seeds, per-subgoal success rates, per-episode planner provenance, and an OpenVINO device/precision sweep. |
 
 ---
 
@@ -100,6 +117,15 @@ python scripts/bench_openvino.py --model models/owlv2-base-ov-int8/openvino_mode
 ran on, stating plainly whether that host is a Core Ultra Series 2/3 part. A benchmark that
 does not identify its own silicon is not evidence of anything.
 
+**What the committed sweep is and is not.** `results/bench_detector.md` was measured on an
+AMD Ryzen AI 9 HX 370. Its `CPU` row is that CPU; its `GPU` row is this machine's **NVIDIA
+RTX 4070 laptop dGPU** — the device name is in `bench_report.json` — and there is no NPU row
+and no Intel iGPU row, because this box has neither. Everything Intel-specific here is the
+export path and the sweep harness, both of which run on target hardware with the commands
+above. The latency numbers are not from target hardware and are not presented as if they
+were. See `docs/06-openvino-findings.md` for the one finding that does transfer: the CPU
+plugin silently runs bf16, so a latency number without its precision is not a measurement.
+
 ---
 
 ## What a plan looks like
@@ -107,29 +133,42 @@ does not identify its own silicon is not evidence of anything.
 `python scripts/run_episode.py --seed 7 --plan-only`
 
 ```
- 1. [A] open_drawer()  || place_fork,pick_mug,place_mug
- 2. [A] pick(object=fork)  || pick_mug,place_mug,place_plate
- 3. [A+B] handoff(object=fork)  [shared zone]
- 4. [A] pick(object=plate)  || place_fork,pick_mug,place_mug
- 5. [B] place(object=fork target=fork)  [shared zone]  || open,pick_plate,pick_spoon,place_spoon
- 6. [B] pick(object=mug)  || open,pick_fork,pick_plate,pick_spoon,place_spoon
- 7. [B] place(object=mug target=mug)  [shared zone]  || open,pick_fork,pick_plate,pick_spoon,place_spoon
- 8. [A+B] handoff(object=plate)  [shared zone]
- 9. [A] pick(object=spoon)  || place_fork,pick_mug,place_mug,place_plate
-10. [B] place(object=plate target=plate)  [shared zone]  || pick_fork,pick_spoon,place_spoon
-11. [A] place(object=spoon target=spoon)  || place_fork,pick_mug,place_mug,place_plate
-12. [A+B] pour(source=bottle into=mug)  [shared zone]
+plan from rules: 11 nodes
+ 1. [A] open_drawer()
+ 2. [A] pick(object=plate)
+ 3. [A+B] handoff(object=plate)  [shared zone]
+ 4. [B] place(object=plate target=plate)  [shared zone]  || pick_fork,pick_spoon,place_spoon
+ 5. [A] pick(object=fork)  || place_plate,pick_mug,place_mug
+ 6. [A] place(object=fork target=fork)  [shared zone]  || pick_mug
+ 7. [B] pick(object=mug)  || pick_fork,place_fork,pick_spoon,place_spoon
+ 8. [B] place(object=mug target=mug)  [shared zone]  || pick_fork,pick_spoon,place_spoon
+ 9. [A] pick(object=spoon)  || place_plate,pick_mug,place_mug
+10. [A] place(object=spoon target=spoon)  || place_plate,pick_mug,place_mug
+11. [B+A] pour(source=bottle into=mug)  [shared zone]
 
-75% of steps can run on both arms at once
+64% of steps can run on both arms at once
 ```
 
-Steps 3 and 8 are the interesting ones, and nobody wrote them. On this seed the fork starts
-in the drawer and the plate starts on the left — both reachable only by arm A — while both
-of their slots lie where only arm B can reach. The intersection is empty, so the scheduler
-found that out from the annulus geometry and inserted two exchanges through the shared zone.
+Step 3 is the interesting one, and nobody wrote it. On this seed the plate starts where
+only arm A can reach and its slot lies where only arm B can reach. The intersection is
+empty, so the scheduler found that out from the annulus geometry and inserted an exchange
+through the shared zone.
 
-Change the seed and the hand-offs move, involve different objects, or disappear entirely.
-That is the whole point: nothing here is tuned to one table.
+Being exact about how far that goes, because it is the claim most worth checking: across a
+hundred seeds it is **always the plate and always A to B**. That is the task, not a script.
+The mug's slot has to sit in the shared lens for the pour, so whichever arm picks the mug
+can also place it; the cutlery is routed to one arm on purpose; the bottle is never put
+away. The plate is the only object whose pick and place can land in different workspaces.
+What the seed varies is *where* the transfer happens.
+
+`tests/test_handoff_is_emergent.py` states that as tests rather than prose: a hand-off
+appears exactly when pick-reach and place-reach do not intersect, and moving the plate
+within reach of its own slot makes the step vanish — same seed, same code, one fewer step.
+
+The `||` column lists the steps the dependency graph would permit to run concurrently.
+**The executor does not run them concurrently** — it walks the list in order and parks the
+idle arm. Two-arm overlap within a single step is real (the hand-off and the pour); overlap
+*between* steps is a property of the plan, not of the execution.
 
 ---
 
@@ -147,28 +186,46 @@ failure is the spoon hand-off" tells you what to fix.
 
 ### Results
 
-| Run | Planner | Seeds | Task success |
-| --- | --- | --- | --- |
-| [results/eval_vlm_seeds0-9.md](results/eval_vlm_seeds0-9.md) | `vlm+rules` (Qwen2-VL-2B, OpenVINO INT4) | 0–9 | **100%** (10/10) |
-| [results/eval_rules_seeds0-99.md](results/eval_rules_seeds0-99.md) | `rules` | 0–99 | **100%** (100/100) |
+| Run | Object positions from | Planner executed | Seeds | Task success |
+| --- | --- | --- | --- | --- |
+| [eval_rules_seeds0-99](results/eval_rules_seeds0-99.md) | simulator state | `rules` 100/100 | 0–99 | **100%** (100/100) |
+| [eval_vlm_seeds0-9](results/eval_vlm_seeds0-9.md) | simulator state | `rules` 10/10 after the VLM is rejected | 0–9 | **100%** (10/10) |
+| [eval_perception_partial](results/eval_perception_partial.md) | **colour detector**, driving bottle + mug | `rules` 10/10 | 0–9 | **70%** (7/10) |
+| [eval_perception](results/eval_perception.md) | **colour detector**, driving all five objects | `rules` 10/10 | 0–9 | **0%** (0/10) |
 
-All seven subgoals — drawer, plate, fork, spoon, mug, mug-upright, bottle-upright — are at
-100% in every run, and the mean is 11.0 steps of 11: no episode ends early. The hundred-seed
-sweep matters more than the ten: only seeds 0–9 were ever looked at while debugging, so the
-other ninety are the number the code was *not* tuned against.
+Read those four rows together; separately they each mislead.
 
-64% of each plan is parallelisable across the two arms. That figure used to read 82%, and
-the 18 points are a deliberate purchase: the shared lens both arms can reach is about
-200 × 90 mm and a laid place setting is 190 mm wide, so a hand-off has nowhere to put an
-object down once the setting is finished. The scheduler therefore reserves the lens —
-everything waits for the hand-off — which took the success rate from 50% to 80% in one
-change. See `_reserve_the_lens_for_handoffs` in `apparecchiato/scheduler.py`.
+**Rows 1–2 measure planning, scheduling and control.** All seven subgoals at 100%, mean 11.0
+steps of 11, no episode ending early. The hundred-seed sweep matters more than the ten: only
+seeds 0–9 were ever opened while debugging. Three specific fixes were chosen by counting
+failures across all hundred, so "never looked at" would overstate it — but nothing was tuned
+per seed, and the per-seed failures that drove those fixes are in the commit log.
+
+**Rows 3–4 measure perception, and it is the weaker half.** With the colour detector driving
+every object the task fails outright: it places the bottle to 10 mm and the mug to 8 mm, but
+the plate to 141 mm and the cutlery to 87–157 mm, against a 45 mm placement tolerance. The
+plate and cutlery are small and achromatic; HSV segmentation has nothing to lock onto. Give
+perception only the two objects it can actually place and the task finishes 7 of 10. That
+boundary is the honest state of the perception path, and `docs/06-openvino-findings.md`
+records why the open-vocabulary detectors do not clear it either.
+
+64% of each plan is **parallelisable on paper** — steps the dependency graph would permit to
+overlap. The executor runs them one at a time; real two-arm concurrency happens *within* the
+hand-off and the pour. That figure used to read 82%, and the 18 points are a deliberate
+purchase: the shared lens is about 200 × 90 mm, a laid place setting is 190 mm wide, so a
+hand-off has nowhere to set an object down once the setting is finished. The scheduler
+reserves the lens — everything waits for the hand-off — which took success from 50% to 80%
+in one change. See `_reserve_the_lens_for_handoffs` in `apparecchiato/scheduler.py`.
 
 Reproduce:
 
 ```bash
-python scripts/run_eval.py --seeds 0-9  --planner vlm+rules --out out/eval_vlm --camera cinematic
 python scripts/run_eval.py --seeds 0-99 --planner rules     --out out/eval100 --no-video
+python scripts/run_eval.py --seeds 0-9  --planner vlm+rules --out out/eval_vlm --camera cinematic
+python scripts/run_eval.py --seeds 0-9  --planner rules --detector colour \
+       --out out/eval_perception --no-video
+python scripts/run_eval.py --seeds 0-9  --planner rules --detector colour \
+       --perceive bottle,mug --out out/eval_perception_partial --no-video
 ```
 
 ---
@@ -190,7 +247,7 @@ apparecchiato/
   eval/              multi-seed harness and report
 scripts/             run_episode, run_eval, diagnose, bench_openvino, verify_env, export_*, calibrate,
                      dayone.ps1 (one-command Windows setup)
-tests/               190 tests, none of which need MuJoCo
+tests/               208 tests, none of which need MuJoCo
 ```
 
 Everything that can be reasoned about without physics — kinematics, geometry, planning,
@@ -198,7 +255,7 @@ scheduling, skill construction — lives outside the simulator and is unit-teste
 `pytest` runs the whole suite in seconds on any machine.
 
 ```bash
-python -m pytest -q     # 190 passed
+python -m pytest -q     # 208 passed
 ```
 
 ---

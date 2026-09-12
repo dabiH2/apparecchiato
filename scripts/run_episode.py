@@ -43,6 +43,9 @@ def main() -> int:
     ap.add_argument("--voice", choices=("mic", "file"), help="speak the command instead")
     ap.add_argument("--voice-file", help="WAV file when --voice file")
     ap.add_argument("--language", default="en")
+    ap.add_argument("--save-transcript", default=None, metavar="PATH",
+                    help="write the Speechmatics result to JSON: final text, every "
+                         "partial hypothesis, language, audio length, round trip")
     ap.add_argument("--max-seconds", type=float, default=180.0)
     args = ap.parse_args()
 
@@ -61,6 +64,21 @@ def main() -> int:
         instruction = tr.text
         print(f'heard: "{instruction}"  ({tr.audio_seconds:.1f}s audio, '
               f'{tr.latency_s:.1f}s round trip)\n')
+        if args.save_transcript:
+            # A voice feature with nothing recorded from it is a claim, not a
+            # result. This writes the artifact -- final text, every partial
+            # hypothesis in order, language, audio length and round-trip latency
+            # -- so one real session leaves evidence in the repo.
+            import json                                          # noqa: PLC0415
+            payload = {"language": tr.language, "text": tr.text,
+                       "partials": tr.partials,
+                       "audio_seconds": round(tr.audio_seconds, 2),
+                       "latency_s": round(tr.latency_s, 2),
+                       "provider": "Speechmatics real-time"}
+            os.makedirs(os.path.dirname(args.save_transcript) or ".", exist_ok=True)
+            with open(args.save_transcript, "w", encoding="utf-8") as fh:
+                json.dump(payload, fh, indent=2, ensure_ascii=False)
+            print(f"wrote {args.save_transcript}")
 
     spec = sample_scene(args.seed)
     if args.dump_mjcf:

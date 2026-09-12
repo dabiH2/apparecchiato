@@ -66,7 +66,9 @@ def run_episode(env: TableEnv, steps: list[Step], *, instruction: str = "",
                 planner: str = "", record: str | None = "cinematic",
                 frame_every: int = 12, max_seconds: float = 180.0,
                 verbose: bool = False, viewer=None,
-                realtime: bool = False) -> EpisodeReport:
+                realtime: bool = False, detector=None,
+                perception_camera: str = "overhead",
+                perceive_only: set | None = None) -> EpisodeReport:
     """Run a scheduled plan.
 
     `viewer` is an optional live MuJoCo viewer (mujoco.viewer.launch_passive);
@@ -83,8 +85,20 @@ def run_episode(env: TableEnv, steps: list[Step], *, instruction: str = "",
         if o.inside_drawer:
             world[o.name] = drawer_content_pos(env.spec, o.name)
 
+    # Perception, when asked for. The default is the simulator's own state, and
+    # saying so plainly matters: every headline number in this repo was produced
+    # that way, so it measures planning, scheduling and control, NOT perception.
+    # Pass a detector and the episode instead starts from where that detector
+    # says the objects are -- the same numbers the rest of the pipeline consumes,
+    # errors and all. `scripts/run_eval.py --detector colour` does this, and the
+    # gap between the two runs is the honest cost of closing the loop.
+    if detector is not None:
+        rep.notes.extend(_perceive(env, detector, perception_camera, world,
+                                   only=perceive_only))
+
     hold = {"A": env.arm_q("A"), "B": env.arm_q("B")}
     grip = {"A": GRIPPER_OPEN, "B": GRIPPER_OPEN}
+    held: dict[str, str | None] = {"A": None, "B": None}
     tick = 0
 
     for st in steps:
@@ -128,7 +142,12 @@ def run_episode(env: TableEnv, steps: list[Step], *, instruction: str = "",
                                     float(env.data.time - sim0)))
         if verbose:
             print(f"  {'ok ' if ok else 'FAIL'} {st.order:2d}. {st.label} {detail}")
-        _update_world(env, st, world)
+        held = _held_after(st, held)
+        notes = _update_world(env, st, world, detector, perception_camera,
+                              skip={v for v in held.values() if v},
+                              only=perceive_only)
+        if notes:
+            rep.notes.extend(notes)
         if not ok:
             break
         if time.perf_counter() - t_start > max_seconds:
@@ -189,7 +208,68 @@ def _with_park(motion: Motion, active, hold: dict, grip: dict) -> Motion:
                   motion.notes + [f"parked idle arm(s) {[w.arm for w in pk.waypoints]} first"])
 
 
-def _update_world(env: TableEnv, st: Step, world: dict) -> None:
+def _perceive(env: TableEnv, detector, camera: str, world: dict,
+              skip: set | None = None, only: set | None = None) -> list[str]:
+    """Replace believed positions with what the detector says, and say how wrong.
+
+    Only for objects the detector could actually be looking at: anything still
+    inside a shut drawer is not visible, and overriding it with whatever blob the
+    segmenter found instead is not perception, it is noise. Everything else takes
+    the detector's answer, errors included.
+
+    This runs after EVERY step, not just at the start. Running it once and then
+    reading simulator state for the rest of the episode produces a perfectly
+    healthy-looking 100% that measures nothing: the first bad reading gets
+    silently corrected by the next update, and the run is indistinguishable from
+    having no perception at all.
+    """
+    notes: list[str] = []
+    skip = skip or set()
+    seen = detector.detect(env, camera)
+    hidden = {o.name for o in env.spec.objects
+              if o.inside_drawer and env.drawer_open() < 0.02}
+    for name, det in seen.items():
+        if name not in world or det is None or name in hidden or name in skip:
+            continue
+        if only and name not in only:
+            continue
+        truth = env.object_pos(name)
+        # x and y from the detector; z from the object library. The detector
+        # back-projects onto the table plane, so its z is the plane, not the
+        # grasp height -- feeding that straight through asks the arm to close its
+        # jaws at z = 0 and it fails with "outside the reachable workspace",
+        # which is a units bug masquerading as a perception result. A real cell
+        # knows how tall a mug is; it does not measure it every time.
+        world[name] = np.array([float(det.pos[0]), float(det.pos[1]),
+                                float(world[name][2])])
+        notes.append(f"{name} located by {detector.name} "
+                     f"{1000 * float(np.linalg.norm(world[name][:2] - truth[:2])):.0f} mm "
+                     f"from truth")
+    return notes
+
+
+def _held_after(st: Step, held: dict) -> dict:
+    """Grasp state after this step, so perception can skip what is in a gripper.
+
+    An overhead detector back-projects onto the TABLE plane. An object 90 mm
+    above it, in a moving gripper, therefore lands somewhere else entirely --
+    re-locating it there is worse than not looking. A real cell has the same
+    rule: while you are holding something, you know where it is.
+    """
+    n = st.node
+    obj = n.args.get("object")
+    if n.skill == "pick":
+        held[st.arms[0]] = obj
+    elif n.skill == "place":
+        held[st.arms[0]] = None
+    elif n.skill == "handoff":
+        held[st.arms[0]], held[st.arms[1]] = None, obj
+    return held
+
+
+def _update_world(env: TableEnv, st: Step, world: dict,
+                  detector=None, camera: str = "overhead",
+                  skip: set | None = None, only: set | None = None) -> None:
     for o in env.spec.objects:
         world[o.name] = env.object_pos(o.name)
         # Heading, not just position: carrying an object turns it, and the next
@@ -199,3 +279,6 @@ def _update_world(env: TableEnv, st: Step, world: dict) -> None:
         world[f"{o.name}:yaw"] = env.object_yaw(o.name)
     if st.node.skill == "open_drawer":
         env.spec.drawer_open = env.drawer_open()
+    if detector is not None:
+        return _perceive(env, detector, camera, world, skip, only)
+    return None
