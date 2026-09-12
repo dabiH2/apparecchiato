@@ -145,6 +145,32 @@ makes the success rate mean something.
 Reported per subgoal, not as a single number. "40% success" tells you nothing; "every
 failure is the spoon hand-off" tells you what to fix.
 
+### Results
+
+| Run | Planner | Seeds | Task success |
+| --- | --- | --- | --- |
+| [results/eval_vlm_seeds0-9.md](results/eval_vlm_seeds0-9.md) | `vlm+rules` (Qwen2-VL-2B, OpenVINO INT4) | 0–9 | **100%** (10/10) |
+| [results/eval_rules_seeds0-9.md](results/eval_rules_seeds0-9.md) | `rules` | 0–9 | **100%** (10/10) |
+| [results/eval_rules_seeds10-39.md](results/eval_rules_seeds10-39.md) | `rules` | 10–39 | **100%** (30/30) |
+
+All seven subgoals — drawer, plate, fork, spoon, mug, mug-upright, bottle-upright — are at
+100% in every run. Seeds 10–39 were never looked at while debugging; they are there so the
+headline number is not the number the code was tuned against.
+
+64% of each plan is parallelisable across the two arms. That figure used to read 82%, and
+the 18 points are a deliberate purchase: the shared lens both arms can reach is about
+200 × 90 mm and a laid place setting is 190 mm wide, so a hand-off has nowhere to put an
+object down once the setting is finished. The scheduler therefore reserves the lens —
+everything waits for the hand-off — which took the success rate from 50% to 80% in one
+change. See `_reserve_the_lens_for_handoffs` in `apparecchiato/scheduler.py`.
+
+Reproduce:
+
+```bash
+python scripts/run_eval.py --seeds 0-9  --planner vlm+rules --out out/eval_vlm
+python scripts/run_eval.py --seeds 10-39 --planner rules    --out out/eval30 --no-video
+```
+
 ---
 
 ## Layout

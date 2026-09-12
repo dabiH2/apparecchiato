@@ -1,0 +1,502 @@
+{
+  "seeds": [
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39
+  ],
+  "instruction": "Open the top drawer, set the plate, fork and spoon on the table, put the mug beside them and pour water into the mug.",
+  "planner": "rules",
+  "success_rate": 1.0,
+  "subgoal_rates": {
+    "bottle_upright": 1.0,
+    "drawer_open": 1.0,
+    "fork_placed": 1.0,
+    "mug_placed": 1.0,
+    "mug_upright": 1.0,
+    "plate_placed": 1.0,
+    "spoon_placed": 1.0
+  },
+  "mean_steps": 11.0,
+  "mean_wall_s": 3.694068183333002,
+  "mean_parallel_fraction": 0.6363636363636365,
+  "failures": [],
+  "per_seed": [
+    {
+      "seed": 10,
+      "success": true,
+      "steps": 11,
+      "wall_s": 12.23,
+      "subgoals": {
+        "drawer_open": true,
+        "plate_placed": true,
+        "mug_placed": true,
+        "fork_placed": true,
+        "spoon_placed": true,
+        "mug_upright": true,
+        "bottle_upright": true
+      }
+    },
+    {
+      "seed": 11,
+      "success": true,
+      "steps": 11,
+      "wall_s": 6.89,
+      "subgoals": {
+        "drawer_open": true,
+        "plate_placed": true,
+        "mug_placed": true,
+        "fork_placed": true,
+        "spoon_placed": true,
+        "mug_upright": true,
+        "bottle_upright": true
+      }
+    },
+    {
+      "seed": 12,
+      "success": true,
+      "steps": 11,
+      "wall_s": 3.56,
+      "subgoals": {
+        "drawer_open": true,
+        "plate_placed": true,
+        "mug_placed": true,
+        "fork_placed": true,
+        "spoon_placed": true,
+        "mug_upright": true,
+        "bottle_upright": true
+      }
+    },
+    {
+      "seed": 13,
+      "success": true,
+      "steps": 11,
+      "wall_s": 3.06,
+      "subgoals": {
+        "drawer_open": true,
+        "plate_placed": true,
+        "mug_placed": true,
+        "fork_placed": true,
+        "spoon_placed": true,
+        "mug_upright": true,
+        "bottle_upright": true
+      }
+    },
+    {
+      "seed": 14,
+      "success": true,
+      "steps": 11,
+      "wall_s": 2.93,
+      "subgoals": {
+        "drawer_open": true,
+        "plate_placed": true,
+        "mug_placed": true,
+        "fork_placed": true,
+        "spoon_placed": true,
+        "mug_upright": true,
+        "bottle_upright": true
+      }
+    },
+    {
+      "seed": 15,
+      "success": true,
+      "steps": 11,
+      "wall_s": 3.51,
+      "subgoals": {
+        "drawer_open": true,
+        "plate_placed": true,
+        "mug_placed": true,
+        "fork_placed": true,
+        "spoon_placed": true,
+        "mug_upright": true,
+        "bottle_upright": true
+      }
+    },
+    {
+      "seed": 16,
+      "success": true,
+      "steps": 11,
+      "wall_s": 3.33,
+      "subgoals": {
+        "drawer_open": true,
+        "plate_placed": true,
+        "mug_placed": true,
+        "fork_placed": true,
+        "spoon_placed": true,
+        "mug_upright": true,
+        "bottle_upright": true
+      }
+    },
+    {
+      "seed": 17,
+      "success": true,
+      "steps": 11,
+      "wall_s": 3.19,
+      "subgoals": {
+        "drawer_open": true,
+        "plate_placed": true,
+        "mug_placed": true,
+        "fork_placed": true,
+        "spoon_placed": true,
+        "mug_upright": true,
+        "bottle_upright": true
+      }
+    },
+    {
+      "seed": 18,
+      "success": true,
+      "steps": 11,
+      "wall_s": 3.27,
+      "subgoals": {
+        "drawer_open": true,
+        "plate_placed": true,
+        "mug_placed": true,
+        "fork_placed": true,
+        "spoon_placed": true,
+        "mug_upright": true,
+        "bottle_upright": true
+      }
+    },
+    {
+      "seed": 19,
+      "success": true,
+      "steps": 11,
+      "wall_s": 2.92,
+      "subgoals": {
+        "drawer_open": true,
+        "plate_placed": true,
+        "mug_placed": true,
+        "fork_placed": true,
+        "spoon_placed": true,
+        "mug_upright": true,
+        "bottle_upright": true
+      }
+    },
+    {
+      "seed": 20,
+      "success": true,
+      "steps": 11,
+      "wall_s": 3.14,
+      "subgoals": {
+        "drawer_open": true,
+        "plate_placed": true,
+        "mug_placed": true,
+        "fork_placed": true,
+        "spoon_placed": true,
+        "mug_upright": true,
+        "bottle_upright": true
+      }
+    },
+    {
+      "seed": 21,
+      "success": true,
+      "steps": 11,
+      "wall_s": 3.33,
+      "subgoals": {
+        "drawer_open": true,
+        "plate_placed": true,
+        "mug_placed": true,
+        "fork_placed": true,
+        "spoon_placed": true,
+        "mug_upright": true,
+        "bottle_upright": true
+      }
+    },
+    {
+      "seed": 22,
+      "success": true,
+      "steps": 11,
+      "wall_s": 3.24,
+      "subgoals": {
+        "drawer_open": true,
+        "plate_placed": true,
+        "mug_placed": true,
+        "fork_placed": true,
+        "spoon_placed": true,
+        "mug_upright": true,
+        "bottle_upright": true
+      }
+    },
+    {
+      "seed": 23,
+      "success": true,
+      "steps": 11,
+      "wall_s": 3.34,
+      "subgoals": {
+        "drawer_open": true,
+        "plate_placed": true,
+        "mug_placed": true,
+        "fork_placed": true,
+        "spoon_placed": true,
+        "mug_upright": true,
+        "bottle_upright": true
+      }
+    },
+    {
+      "seed": 24,
+      "success": true,
+      "steps": 11,
+      "wall_s": 3.23,
+      "subgoals": {
+        "drawer_open": true,
+        "plate_placed": true,
+        "mug_placed": true,
+        "fork_placed": true,
+        "spoon_placed": true,
+        "mug_upright": true,
+        "bottle_upright": true
+      }
+    },
+    {
+      "seed": 25,
+      "success": true,
+      "steps": 11,
+      "wall_s": 3.13,
+      "subgoals": {
+        "drawer_open": true,
+        "plate_placed": true,
+        "mug_placed": true,
+        "fork_placed": true,
+        "spoon_placed": true,
+        "mug_upright": true,
+        "bottle_upright": true
+      }
+    },
+    {
+      "seed": 26,
+      "success": true,
+      "steps": 11,
+      "wall_s": 3.23,
+      "subgoals": {
+        "drawer_open": true,
+        "plate_placed": true,
+        "mug_placed": true,
+        "fork_placed": true,
+        "spoon_placed": true,
+        "mug_upright": true,
+        "bottle_upright": true
+      }
+    },
+    {
+      "seed": 27,
+      "success": true,
+      "steps": 11,
+      "wall_s": 3.07,
+      "subgoals": {
+        "drawer_open": true,
+        "plate_placed": true,
+        "mug_placed": true,
+        "fork_placed": true,
+        "spoon_placed": true,
+        "mug_upright": true,
+        "bottle_upright": true
+      }
+    },
+    {
+      "seed": 28,
+      "success": true,
+      "steps": 11,
+      "wall_s": 3.24,
+      "subgoals": {
+        "drawer_open": true,
+        "plate_placed": true,
+        "mug_placed": true,
+        "fork_placed": true,
+        "spoon_placed": true,
+        "mug_upright": true,
+        "bottle_upright": true
+      }
+    },
+    {
+      "seed": 29,
+      "success": true,
+      "steps": 11,
+      "wall_s": 3.16,
+      "subgoals": {
+        "drawer_open": true,
+        "plate_placed": true,
+        "mug_placed": true,
+        "fork_placed": true,
+        "spoon_placed": true,
+        "mug_upright": true,
+        "bottle_upright": true
+      }
+    },
+    {
+      "seed": 30,
+      "success": true,
+      "steps": 11,
+      "wall_s": 3.11,
+      "subgoals": {
+        "drawer_open": true,
+        "plate_placed": true,
+        "mug_placed": true,
+        "fork_placed": true,
+        "spoon_placed": true,
+        "mug_upright": true,
+        "bottle_upright": true
+      }
+    },
+    {
+      "seed": 31,
+      "success": true,
+      "steps": 11,
+      "wall_s": 3.47,
+      "subgoals": {
+        "drawer_open": true,
+        "plate_placed": true,
+        "mug_placed": true,
+        "fork_placed": true,
+        "spoon_placed": true,
+        "mug_upright": true,
+        "bottle_upright": true
+      }
+    },
+    {
+      "seed": 32,
+      "success": true,
+      "steps": 11,
+      "wall_s": 3.13,
+      "subgoals": {
+        "drawer_open": true,
+        "plate_placed": true,
+        "mug_placed": true,
+        "fork_placed": true,
+        "spoon_placed": true,
+        "mug_upright": true,
+        "bottle_upright": true
+      }
+    },
+    {
+      "seed": 33,
+      "success": true,
+      "steps": 11,
+      "wall_s": 3.17,
+      "subgoals": {
+        "drawer_open": true,
+        "plate_placed": true,
+        "mug_placed": true,
+        "fork_placed": true,
+        "spoon_placed": true,
+        "mug_upright": true,
+        "bottle_upright": true
+      }
+    },
+    {
+      "seed": 34,
+      "success": true,
+      "steps": 11,
+      "wall_s": 3.18,
+      "subgoals": {
+        "drawer_open": true,
+        "plate_placed": true,
+        "mug_placed": true,
+        "fork_placed": true,
+        "spoon_placed": true,
+        "mug_upright": true,
+        "bottle_upright": true
+      }
+    },
+    {
+      "seed": 35,
+      "success": true,
+      "steps": 11,
+      "wall_s": 3.05,
+      "subgoals": {
+        "drawer_open": true,
+        "plate_placed": true,
+        "mug_placed": true,
+        "fork_placed": true,
+        "spoon_placed": true,
+        "mug_upright": true,
+        "bottle_upright": true
+      }
+    },
+    {
+      "seed": 36,
+      "success": true,
+      "steps": 11,
+      "wall_s": 3.19,
+      "subgoals": {
+        "drawer_open": true,
+        "plate_placed": true,
+        "mug_placed": true,
+        "fork_placed": true,
+        "spoon_placed": true,
+        "mug_upright": true,
+        "bottle_upright": true
+      }
+    },
+    {
+      "seed": 37,
+      "success": true,
+      "steps": 11,
+      "wall_s": 3.13,
+      "subgoals": {
+        "drawer_open": true,
+        "plate_placed": true,
+        "mug_placed": true,
+        "fork_placed": true,
+        "spoon_placed": true,
+        "mug_upright": true,
+        "bottle_upright": true
+      }
+    },
+    {
+      "seed": 38,
+      "success": true,
+      "steps": 11,
+      "wall_s": 3.06,
+      "subgoals": {
+        "drawer_open": true,
+        "plate_placed": true,
+        "mug_placed": true,
+        "fork_placed": true,
+        "spoon_placed": true,
+        "mug_upright": true,
+        "bottle_upright": true
+      }
+    },
+    {
+      "seed": 39,
+      "success": true,
+      "steps": 11,
+      "wall_s": 5.32,
+      "subgoals": {
+        "drawer_open": true,
+        "plate_placed": true,
+        "mug_placed": true,
+        "fork_placed": true,
+        "spoon_placed": true,
+        "mug_upright": true,
+        "bottle_upright": true
+      }
+    }
+  ]
+}
