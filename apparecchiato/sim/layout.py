@@ -239,12 +239,44 @@ def can_reach(world_xyz, arm: str, pitch: float = TOP_DOWN,
                             float(pitch), float(clearance))
 
 
-def reaching_arms(world_xyz, pitch: float = TOP_DOWN) -> list[str]:
-    return [a for a in ("A", "B") if can_reach(world_xyz, a, pitch)]
+def reaching_arms(world_xyz, pitch: float = TOP_DOWN,
+                  clearance: float = MIN_CLEARANCE) -> list[str]:
+    return [a for a in ("A", "B") if can_reach(world_xyz, a, pitch, clearance)]
 
 
-def in_shared_workspace(world_xyz, pitch: float = TOP_DOWN) -> bool:
-    return len(reaching_arms(world_xyz, pitch)) == 2
+def in_shared_workspace(world_xyz, pitch: float = TOP_DOWN,
+                        clearance: float = MIN_CLEARANCE) -> bool:
+    return len(reaching_arms(world_xyz, pitch, clearance)) == 2
+
+
+# The mug slot is held to a stiffer standard than everything else, because it is
+# the only place an arm has to stand off above something it did NOT put there.
+# The pour asks one arm to hold the mug while the other tips the bottle, and it
+# aims at the mug's MEASURED position, not at the slot. On seed 9 the mug was
+# placed 11 mm behind its slot -- a perfectly good placement, well inside the
+# 25 mm success tolerance -- and those 11 mm put it outside BOTH arms' standoff
+# range. The pour then failed to build at all. So the slot has to be reachable
+# with the mug anywhere in a POUR_SLACK box around it, not just dead centre.
+POUR_CLEARANCE = 0.028
+#
+# The slack ended up at zero, and that measurement is the interesting part: the
+# shared lens is so tight that requiring the mug slot to survive a 14 mm box
+# emptied it completely (40 of 40 seeds could not place a setting at all), and
+# even 6 mm cost 26 of 40. There is no room on the SCENE side to buy tolerance
+# for placement error. It is bought on the SKILL side instead -- `pour` walks
+# the steady target back toward the slot until it finds a pose it can stand off
+# above -- which is where it belongs anyway: the robot should cope with the mug
+# being a centimetre off, not be handed a table where it never can be.
+POUR_SLACK = 0.0
+
+
+def robustly_shared(world_xyz, *, clearance: float = POUR_CLEARANCE,
+                    slack: float = POUR_SLACK) -> bool:
+    """Both arms can stand off here even if the object lands `slack` off centre."""
+    p = np.asarray(world_xyz, dtype=float).reshape(3)
+    offsets = ((0.0, 0.0), (slack, 0.0), (-slack, 0.0), (0.0, slack), (0.0, -slack))
+    return all(in_shared_workspace(p + np.array([dx, dy, 0.0]), clearance=clearance)
+               for dx, dy in offsets)
 
 
 # --- scene description -----------------------------------------------------
@@ -406,22 +438,35 @@ def sample_scene(seed: int) -> SceneSpec:
         return not (abs(float(p[0]) - drawer_x) < CAB_KEEPOUT_X
                     and float(p[1]) > DRAWER_CLOSED_Y - CAB_KEEPOUT_FRONT)
 
-    def sample_clear(region, z, kind=None, avoid_goals=()):
+    def sample_clear(region, z, kind=None, avoid_goals=(), avoid=None):
+        # `avoid` is for things that are ALREADY STANDING there, as opposed to
+        # slots, which are empty until something is put in them. It was missing,
+        # and nothing kept the bottle away from the plate's and mug's spawns: on
+        # seeds 1 and 8 the bottle stood beside the plate, arm A's finger met it
+        # 0.1 mm in on the way down, the descent stalled 13 mm high and the jaws
+        # closed on the plate's top edge. Reported, of course, as "lost the
+        # plate" -- at a step where the plate had never been held.
         for _ in range(200):
             p = _sample_in_region(rng, region, z=z)
             if not clear_of_cabinet(p):
                 continue
-            if kind is None or _slot_clear_of(
+            if kind is not None and not _slot_clear_of(
                     p, kind, {n: goals[n] for n in avoid_goals}, scales):
-                return p
+                continue
+            if kind is not None and avoid and not _slot_clear_of(
+                    p, kind, avoid, scales):
+                continue
+            return p
         raise RuntimeError(
-            f"could not place an object in {region!r} clear of the cabinet and slots")
+            f"could not place an object in {region!r} clear of the cabinet, "
+            f"the slots and what is already on the table")
 
     # An object must not spawn on a slot that something ELSE has to be placed
     # into -- including its own slot's neighbours. Its own slot is exempt: it is
     # about to be picked up and moved there anyway.
     plate_p = sample_clear(_A_ONLY, gz["plate"], "plate", ("mug", "fork", "spoon"))
-    mug_p = sample_clear(_B_ONLY, gz["mug"], "mug", ("plate", "fork", "spoon"))
+    mug_p = sample_clear(_B_ONLY, gz["mug"], "mug", ("plate", "fork", "spoon"),
+                         avoid={"plate": plate_p})
     # The bottle must be clear of EVERY goal slot, and for the bottle that is
     # non-negotiable: it is the one object that is never put away. It is poured
     # from and set back down, so wherever it spawns it stands there for the whole
@@ -440,7 +485,8 @@ def sample_scene(seed: int) -> SceneSpec:
         for _ in range(40):
             try:
                 cand = sample_clear(region, gz["bottle"], "bottle",
-                                    ("plate", "mug", "fork", "spoon"))
+                                    ("plate", "mug", "fork", "spoon"),
+                                    avoid={"plate": plate_p, "mug": mug_p})
             except RuntimeError:
                 break
             d = float(np.linalg.norm(cand[:2] - mug_p[:2]))
@@ -655,7 +701,7 @@ def _sample_place_setting(rng, *, gz: dict, tries: int = 300) -> dict:
             base[name] = (float(plate_goal[0] + dx), float(plate_goal[1] + dy), gz[kind])
         # The mug slot must be reachable by BOTH arms, because pouring needs one
         # arm steadying the mug while the other tips the bottle over it.
-        if not in_shared_workspace(np.asarray(base["mug"])):
+        if not robustly_shared(np.asarray(base["mug"])):
             continue
         if not all(reaching_arms(np.asarray(g)) for g in base.values()):
             continue
@@ -701,6 +747,8 @@ def validate_scene(spec: SceneSpec) -> None:
     for name, g in spec.goals.items():
         if not reaching_arms(np.asarray(g)):
             problems.append(f"goal for {name} at {np.round(g, 3)} is unreachable")
+        if name == "mug" and not robustly_shared(np.asarray(g)):
+            problems.append(f"mug slot at {np.round(g, 3)} has no pouring margin")
         # A slot inside the cabinet keep-out is as unusable as an unreachable
         # one, and fails later and more confusingly: the arm gets there, drives
         # a finger into the cabinet and releases the object short.
@@ -711,6 +759,14 @@ def validate_scene(spec: SceneSpec) -> None:
         problems.append(
             f"hand-off point {np.round(spec.handoff_point, 3)} is not reachable by both arms")
     scales = {o.kind: o.scale for o in spec.objects}
+    # Two things standing on the table too close together is not a cosmetic
+    # problem: the jaws need room to descend BESIDE whichever one is picked.
+    standing = [o for o in spec.objects if not o.inside_drawer]
+    for i, a in enumerate(standing):
+        others = {b.kind: b.pos for b in standing[i + 1:]}
+        if others and not _slot_clear_of(a.pos, a.kind, others, scales):
+            problems.append(f"{a.name} at {np.round(a.grasp_point, 3)} is crowded "
+                            f"by another object")
     obstructing = dict(spec.goals)
     obstructing["bottle"] = spec.by_name("bottle").pos
     if not _slot_clear_of(spec.handoff_point, "plate", obstructing, scales,

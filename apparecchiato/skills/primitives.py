@@ -224,6 +224,23 @@ def _standoff(arm: str, target, h_pref: float, *, roll: float = 0.0, prefer=None
     )
 
 
+def _nearest_standoffable(measured, fallback, arm: str,
+                          h: float = APPROACH_H, steps: int = 9) -> np.ndarray:
+    """The point closest to `measured` on the segment to `fallback` that `arm`
+    can stand off above. `fallback` is a sampler-validated slot, so the search
+    always terminates somewhere usable."""
+    measured = np.asarray(measured, dtype=float).reshape(3)
+    fallback = np.asarray(fallback, dtype=float).reshape(3)
+    for t in np.linspace(0.0, 1.0, steps):
+        cand = measured + (fallback - measured) * float(t)
+        try:
+            _standoff(arm, cand, h)
+            return cand
+        except SkillError:
+            continue
+    return fallback
+
+
 def turn_pose(arm: str, target, roll: float = 0.0) -> np.ndarray:
     """The park pose, re-aimed at `target`: same tucked shape, new base heading.
 
@@ -462,6 +479,14 @@ def pour(steady_arm: str, pour_arm: str, scene, source: str, into: str,
         raise SkillError(f"do not know where the {into} is")
     bottle = np.asarray((world or {}).get(source, scene.by_name(source).grasp_point),
                         dtype=float)
+    # The mug is wherever it actually ended up, which is not exactly its slot.
+    # An 11 mm placement error -- well inside the 25 mm success tolerance -- was
+    # enough to put it outside both arms' standoff range and kill the pour before
+    # it began. The slot IS validated reachable, so walk back toward it until the
+    # steady arm can stand off, and stop at the first pose that works: the mug
+    # only has to be held still, and this misses it by the smallest amount the
+    # geometry allows rather than by the whole placement error.
+    mug = _nearest_standoffable(mug, scene.goals.get(into, mug), steady_arm)
     s_pre = _standoff(steady_arm, mug, APPROACH_H, what="pre-steady")
     s_at = _ik_world(mug, steady_arm, prefer=s_pre, what="steady the mug")
     b_pre = _standoff(pour_arm, bottle, APPROACH_H, what="pre-bottle")
