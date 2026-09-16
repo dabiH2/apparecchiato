@@ -29,6 +29,10 @@ def main() -> int:
     ap.add_argument("--width", type=int, default=1280)
     ap.add_argument("--font", default="C:/Windows/Fonts/segoeui.ttf")
     ap.add_argument("--contact-sheet", action="store_true")
+    ap.add_argument("--aspect", default="16:9", choices=("16:9", "source"),
+                    help="16:9 is what the lablab submission form asks for")
+    ap.add_argument("--crop-y", type=int, default=64,
+                    help="top edge of the 16:9 crop within the source frame")
     a = ap.parse_args()
 
     if shutil.which("ffmpeg") is None:
@@ -51,7 +55,17 @@ def main() -> int:
     def esc(s: str) -> str:
         return s.replace(":", r"\:").replace("'", "")
 
-    vf = (f"scale={a.width}:-2,"
+    # Crop to 16:9 BEFORE scaling. lablab's submission form requires 16:9 and the
+    # simulator renders 4:3, so a straight scale would have been rejected or
+    # letterboxed by whoever opened it. The crop is biased downward (`--crop-y`)
+    # because the interesting half of a 4:3 frame here is the table, not the
+    # ceiling: a centred crop takes an equal bite out of both and loses the near
+    # edge of the place setting.
+    crop = ""
+    if a.aspect == "16:9":
+        crop = f"crop=iw:iw*9/16:0:{a.crop_y},"
+
+    vf = (f"{crop}scale={a.width}:-2,"
           f"drawbox=y=0:w=iw:h=118:color=black@0.62:t=fill,"
           f"drawtext=fontfile='{font}':text='{esc(TITLE)}':"
           f"x=44:y=28:fontsize=42:fontcolor=white,"
