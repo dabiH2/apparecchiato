@@ -49,7 +49,20 @@ def main() -> int:
     ap.add_argument("--no-markers", action="store_true",
                     help="drop the goal-slot overlay -- for the hero shot, where "
                          "the laid table should read without annotation")
+    ap.add_argument("--repair-vlm-plan", action="store_true",
+                    help="let the validator REPAIR the model's referential "
+                         "mistakes instead of only rejecting them: dangling "
+                         "dependency ids, nodes naming no skill. It may delete "
+                         "and reorder what the model wrote; it may never add to "
+                         "it, and every repair is named in the report. Off by "
+                         "default, so the committed numbers reproduce exactly.")
     args = ap.parse_args()
+
+    if args.repair_vlm_plan:
+        # Threaded through the environment rather than the planner constructor:
+        # `evaluate` builds the chain from a spec string, and a per-backend kwarg
+        # would have to be understood by every backend in it.
+        os.environ["APPARECCHIATO_VLM_REPAIR"] = "1"
 
     os.makedirs(args.out, exist_ok=True)
     summary = evaluate(

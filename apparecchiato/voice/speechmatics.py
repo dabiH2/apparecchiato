@@ -35,6 +35,10 @@ class Transcript:
     language: str = "en"
     audio_seconds: float = 0.0
     latency_s: float = 0.0
+    # Informational frames the server sent (quota, warnings). Kept rather than
+    # dropped: they are what a session looks like from the outside, and the one
+    # that arrives before RecognitionStarted is the one that broke this client.
+    info: list = field(default_factory=list)
 
 
 class SpeechmaticsClient:
@@ -80,9 +84,28 @@ class SpeechmaticsClient:
         async with websockets.connect(RT_URL, additional_headers=headers,
                                       max_size=None) as ws:
             await ws.send(self._start_message())
-            ack = json.loads(await ws.recv())
-            if ack.get("message") != "RecognitionStarted":
-                raise VoiceError(f"Speechmatics refused the session: {ack}")
+            # Wait for RecognitionStarted, skipping anything informational that
+            # arrives ahead of it. The server sends an `Info` frame first --
+            # `concurrent_session_usage`, reporting "1 of quota 2" -- and reading
+            # exactly one message treated that as a refusal and killed the
+            # session. It cost nothing to find here and would have cost the whole
+            # voice demo live on stage, which is the kind of failure a first
+            # message is guaranteed to produce and a unit test never will.
+            while True:
+                ack = json.loads(await ws.recv())
+                kind = ack.get("message")
+                if kind == "RecognitionStarted":
+                    break
+                if kind == "Info":
+                    tr.info.append(ack)
+                    continue
+                if kind == "Warning":
+                    tr.info.append(ack)
+                    continue
+                if kind == "Error":
+                    raise VoiceError(f"Speechmatics refused the session: {ack}")
+                raise VoiceError(
+                    f"unexpected message while starting recognition: {ack}")
 
             async def send_audio():
                 n = 0

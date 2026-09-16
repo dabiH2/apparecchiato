@@ -1,0 +1,153 @@
+{
+  "model": "models/qwen2-vl-2b-ov-int4",
+  "device": "CPU",
+  "instruction": "Open the top drawer, set the plate, fork and spoon on the table, put the mug beside them and pour water into the mug.",
+  "camera": "overhead",
+  "seeds": [
+    0,
+    1
+  ],
+  "rows": [
+    {
+      "seed": 0,
+      "condition": "none",
+      "swapped_with": null,
+      "wall_s": 49.22,
+      "chars": 831,
+      "digest": "f45b40e306fd",
+      "error": null,
+      "raw": "{\"nodes\": [{\"id\": \"n0\", \"skill\": \"open_drawer\", \"args\": {}, \"arm\": \"A\", \"deps\": [], \"rationale\": \"A needs to open the drawer\"}, {\"id\": \"n1\", \"skill\": \"pick\", \"args\": {\"object\": \"plate\"}, \"arm\": \"A\", \"deps\": [\"n0\"], \" \"rationale\": \"A needs to pick the plate\"}, {\"id\": \"n2\", \": \" next pick skill, \"args\": {\"object\": \"fork\"}, \"arm\": \"A\", \"deps\": [\"n1\"], \"rationale\": \"A needs to pick the fork\"}, {\"id\": \"n3\", \"skill\": \"pick\", \"args\": {\"object\": \"spoon\"}, \"arm\": \"A\", \"deps\": [\"n2\"], \"rationale\": \"A needs to pick the spoon\"}, {\"id\": \"n4\", \": \"place\", \"args\": {\"object\": \"mug\", \"target\": \"mug\", \"arm\": \" next pick skill, \"deps\": [\"n3\"], \"rationale\": \"B needs to place the mug\"}, {\"id\": \"n5\", \"skill\": \"pour\", \"args\": {\"source\": \"water\", \"into\": \"mug\", \"arm\": \"B\", \"deps\": [\"n4\"], \"rationale\": \"B needs to pour water into the mug\"}}]}]}",
+      "stage": {
+        "as-emitted": "parsed, graph rejected: node n3 depends on unknown node(s) ['n2']",
+        "repaired": "graph built, scene rejected: plan references objects that are not in the scene: ['water']"
+      }
+    },
+    {
+      "seed": 0,
+      "condition": "real",
+      "swapped_with": null,
+      "wall_s": 55.8,
+      "chars": 679,
+      "digest": "33227de30e3d",
+      "error": null,
+      "raw": "{\"nodes\": [\n  {\"id\": \"n0\", \"skill\":_open_drawer\", \"args\": {}, \"arm\": \"A\", \"deps\": [\"n1\", \"n2\", \"n3\", \"n4\"], \"rationale\": \" \"A can open the drawer, but it needs to pick up the spoon first, so it must go through the shared zone\"},\n  {\"id\": \"n1\", \" \"n2\", \"n3 spoon\", \"n3\", \"n4\", \"n5\", \"n6\", \"n7\", \"n8\", \"n9\", \"n1\", \"n1\", \"n12\", \"n13\", \"n14\", \"n15\", \"n16\", \"n17\", \"n18\", \"n1\", \"n19\", \"n20\", \"n\", \"n21\", \"n22\", \" spoon\", \"n23\", \"n24\", \"n2\", \"n25\", \"n26\", \"n27\", \"\", \"n28\", \"n29\", \"n29\", \"n30\", \"n31\", \"n32\", \"n33\", \"n34\", \"n35\", \"n36\", \"n37\", \"n38\", \"n39\", \"n40\", \"n41\", \"42\", \"n43\", \"n44\", \"n45\", \"n46\", \"n47\", \"n48\", \"n49\", \"n50\", \"n51\", \"n52\", \"n53\", \"n54\", \"n55\", \"n56\", \"n57\", \"n",
+      "stage": {
+        "as-emitted": "parsed, graph rejected: node n0 depends on unknown node(s) ['n1', 'n2', 'n3', 'n4']",
+        "repaired": "graph built, scene rejected: plan contains no manipulation: 1 node(s), all of them ['open_drawer'] "
+      }
+    },
+    {
+      "seed": 0,
+      "condition": "blank",
+      "swapped_with": null,
+      "wall_s": 93.32,
+      "chars": 1114,
+      "digest": "c52f6d2b8d1d",
+      "error": null,
+      "raw": "{\"nodes\": [\n  {\"id\": \"n0\", \"skill\":_open_drawer\", \"args\": {}, \"arm\": \"A\", \"deps\": [\"n1\", \"n2\"], \"rationale\": \"A needs to open the drawer first before picking up the objects\"}, \n  {\"id\": \"n1\", \"skill\": \"pick\", \"_args: {\"object\": \" \" \"target\": \"}, \" \" \"arm\": \"A\", \"deps\": [\"n0\"], \"rationale\": \"A needs to pick up the objects before opening the drawer\"}, \n  {\"id\": \"n2\", \"skill\": \"place\", \"args\": {\"object\": \"mug\", \"target\": \"mug\"}, \"arm\": \"B\", \"deps\": [\"n1\"], \"rationale\": \"B needs to place the mug before pouring water into it\"}, \n  {\"id\": \"n3\", \"skill\": \"pick\", \"_args: {\"object\": \"spoon\", \"target\": \"spoon\"}, \"arm\":\": \"A\", \"deps\": [\"n2\"], \"ration\": \"B\", \"rationale\": \"A needs to pick up the spoon before pouring water into the mug\"}, \n  {\"id\": \"n4\", \"skill\": \"pick\", the_args: {\"object\": \"fork\", \"target\":\": \"fork\"}, \"arm\": \"A\", \"deps\": [\"n3\"], \"n4\"], \"rationale\": \"A needs to pick up the fork before pouring water into the mug\"},\n  {\"id\": \"n5\", \"skill\": \"place\", \"args\": {\"object\": \"and\", \"target\": \"and\"}, \"arm\": \"B\", \"deps\": [\"n4\"], \"rationale\": \"B needs to place the and before pouring water into the mug\"}\n],",
+      "stage": {
+        "as-emitted": "parsed, graph rejected: node n0 depends on unknown node(s) ['n1']",
+        "repaired": "graph built, scene rejected: plan places mug without ever picking it"
+      }
+    },
+    {
+      "seed": 0,
+      "condition": "swapped",
+      "swapped_with": 1,
+      "wall_s": 85.05,
+      "chars": 679,
+      "digest": "33227de30e3d",
+      "error": null,
+      "raw": "{\"nodes\": [\n  {\"id\": \"n0\", \"skill\":_open_drawer\", \"args\": {}, \"arm\": \"A\", \"deps\": [\"n1\", \"n2\", \"n3\", \"n4\"], \"rationale\": \" \"A can open the drawer, but it needs to pick up the spoon first, so it must go through the shared zone\"},\n  {\"id\": \"n1\", \" \"n2\", \"n3 spoon\", \"n3\", \"n4\", \"n5\", \"n6\", \"n7\", \"n8\", \"n9\", \"n1\", \"n1\", \"n12\", \"n13\", \"n14\", \"n15\", \"n16\", \"n17\", \"n18\", \"n1\", \"n19\", \"n20\", \"n\", \"n21\", \"n22\", \" spoon\", \"n23\", \"n24\", \"n2\", \"n25\", \"n26\", \"n27\", \"\", \"n28\", \"n29\", \"n29\", \"n30\", \"n31\", \"n32\", \"n33\", \"n34\", \"n35\", \"n36\", \"n37\", \"n38\", \"n39\", \"n40\", \"n41\", \"42\", \"n43\", \"n44\", \"n45\", \"n46\", \"n47\", \"n48\", \"n49\", \"n50\", \"n51\", \"n52\", \"n53\", \"n54\", \"n55\", \"n56\", \"n57\", \"n",
+      "stage": {
+        "as-emitted": "parsed, graph rejected: node n0 depends on unknown node(s) ['n1', 'n2', 'n3', 'n4']",
+        "repaired": "graph built, scene rejected: plan contains no manipulation: 1 node(s), all of them ['open_drawer'] "
+      }
+    },
+    {
+      "seed": 1,
+      "condition": "none",
+      "swapped_with": null,
+      "wall_s": 67.53,
+      "chars": 831,
+      "digest": "f45b40e306fd",
+      "error": null,
+      "raw": "{\"nodes\": [{\"id\": \"n0\", \"skill\": \"open_drawer\", \"args\": {}, \"arm\": \"A\", \"deps\": [], \"rationale\": \"A needs to open the drawer\"}, {\"id\": \"n1\", \"skill\": \"pick\", \"args\": {\"object\": \"plate\"}, \"arm\": \"A\", \"deps\": [\"n0\"], \" \"rationale\": \"A needs to pick the plate\"}, {\"id\": \"n2\", \": \" next pick skill, \"args\": {\"object\": \"fork\"}, \"arm\": \"A\", \"deps\": [\"n1\"], \"rationale\": \"A needs to pick the fork\"}, {\"id\": \"n3\", \"skill\": \"pick\", \"args\": {\"object\": \"spoon\"}, \"arm\": \"A\", \"deps\": [\"n2\"], \"rationale\": \"A needs to pick the spoon\"}, {\"id\": \"n4\", \": \"place\", \"args\": {\"object\": \"mug\", \"target\": \"mug\", \"arm\": \" next pick skill, \"deps\": [\"n3\"], \"rationale\": \"B needs to place the mug\"}, {\"id\": \"n5\", \"skill\": \"pour\", \"args\": {\"source\": \"water\", \"into\": \"mug\", \"arm\": \"B\", \"deps\": [\"n4\"], \"rationale\": \"B needs to pour water into the mug\"}}]}]}",
+      "stage": {
+        "as-emitted": "parsed, graph rejected: node n3 depends on unknown node(s) ['n2']",
+        "repaired": "graph built, scene rejected: plan references objects that are not in the scene: ['water']"
+      }
+    },
+    {
+      "seed": 1,
+      "condition": "real",
+      "swapped_with": null,
+      "wall_s": 93.74,
+      "chars": 679,
+      "digest": "33227de30e3d",
+      "error": null,
+      "raw": "{\"nodes\": [\n  {\"id\": \"n0\", \"skill\":_open_drawer\", \"args\": {}, \"arm\": \"A\", \"deps\": [\"n1\", \"n2\", \"n3\", \"n4\"], \"rationale\": \" \"A can open the drawer, but it needs to pick up the spoon first, so it must go through the shared zone\"},\n  {\"id\": \"n1\", \" \"n2\", \"n3 spoon\", \"n3\", \"n4\", \"n5\", \"n6\", \"n7\", \"n8\", \"n9\", \"n1\", \"n1\", \"n12\", \"n13\", \"n14\", \"n15\", \"n16\", \"n17\", \"n18\", \"n1\", \"n19\", \"n20\", \"n\", \"n21\", \"n22\", \" spoon\", \"n23\", \"n24\", \"n2\", \"n25\", \"n26\", \"n27\", \"\", \"n28\", \"n29\", \"n29\", \"n30\", \"n31\", \"n32\", \"n33\", \"n34\", \"n35\", \"n36\", \"n37\", \"n38\", \"n39\", \"n40\", \"n41\", \"42\", \"n43\", \"n44\", \"n45\", \"n46\", \"n47\", \"n48\", \"n49\", \"n50\", \"n51\", \"n52\", \"n53\", \"n54\", \"n55\", \"n56\", \"n57\", \"n",
+      "stage": {
+        "as-emitted": "parsed, graph rejected: node n0 depends on unknown node(s) ['n1', 'n2', 'n3', 'n4']",
+        "repaired": "graph built, scene rejected: plan contains no manipulation: 1 node(s), all of them ['open_drawer'] "
+      }
+    },
+    {
+      "seed": 1,
+      "condition": "blank",
+      "swapped_with": null,
+      "wall_s": 95.34,
+      "chars": 1114,
+      "digest": "c52f6d2b8d1d",
+      "error": null,
+      "raw": "{\"nodes\": [\n  {\"id\": \"n0\", \"skill\":_open_drawer\", \"args\": {}, \"arm\": \"A\", \"deps\": [\"n1\", \"n2\"], \"rationale\": \"A needs to open the drawer first before picking up the objects\"}, \n  {\"id\": \"n1\", \"skill\": \"pick\", \"_args: {\"object\": \" \" \"target\": \"}, \" \" \"arm\": \"A\", \"deps\": [\"n0\"], \"rationale\": \"A needs to pick up the objects before opening the drawer\"}, \n  {\"id\": \"n2\", \"skill\": \"place\", \"args\": {\"object\": \"mug\", \"target\": \"mug\"}, \"arm\": \"B\", \"deps\": [\"n1\"], \"rationale\": \"B needs to place the mug before pouring water into it\"}, \n  {\"id\": \"n3\", \"skill\": \"pick\", \"_args: {\"object\": \"spoon\", \"target\": \"spoon\"}, \"arm\":\": \"A\", \"deps\": [\"n2\"], \"ration\": \"B\", \"rationale\": \"A needs to pick up the spoon before pouring water into the mug\"}, \n  {\"id\": \"n4\", \"skill\": \"pick\", the_args: {\"object\": \"fork\", \"target\":\": \"fork\"}, \"arm\": \"A\", \"deps\": [\"n3\"], \"n4\"], \"rationale\": \"A needs to pick up the fork before pouring water into the mug\"},\n  {\"id\": \"n5\", \"skill\": \"place\", \"args\": {\"object\": \"and\", \"target\": \"and\"}, \"arm\": \"B\", \"deps\": [\"n4\"], \"rationale\": \"B needs to place the and before pouring water into the mug\"}\n],",
+      "stage": {
+        "as-emitted": "parsed, graph rejected: node n0 depends on unknown node(s) ['n1']",
+        "repaired": "graph built, scene rejected: plan places mug without ever picking it"
+      }
+    },
+    {
+      "seed": 1,
+      "condition": "swapped",
+      "swapped_with": 0,
+      "wall_s": 79.5,
+      "chars": 679,
+      "digest": "33227de30e3d",
+      "error": null,
+      "raw": "{\"nodes\": [\n  {\"id\": \"n0\", \"skill\":_open_drawer\", \"args\": {}, \"arm\": \"A\", \"deps\": [\"n1\", \"n2\", \"n3\", \"n4\"], \"rationale\": \" \"A can open the drawer, but it needs to pick up the spoon first, so it must go through the shared zone\"},\n  {\"id\": \"n1\", \" \"n2\", \"n3 spoon\", \"n3\", \"n4\", \"n5\", \"n6\", \"n7\", \"n8\", \"n9\", \"n1\", \"n1\", \"n12\", \"n13\", \"n14\", \"n15\", \"n16\", \"n17\", \"n18\", \"n1\", \"n19\", \"n20\", \"n\", \"n21\", \"n22\", \" spoon\", \"n23\", \"n24\", \"n2\", \"n25\", \"n26\", \"n27\", \"\", \"n28\", \"n29\", \"n29\", \"n30\", \"n31\", \"n32\", \"n33\", \"n34\", \"n35\", \"n36\", \"n37\", \"n38\", \"n39\", \"n40\", \"n41\", \"42\", \"n43\", \"n44\", \"n45\", \"n46\", \"n47\", \"n48\", \"n49\", \"n50\", \"n51\", \"n52\", \"n53\", \"n54\", \"n55\", \"n56\", \"n57\", \"n",
+      "stage": {
+        "as-emitted": "parsed, graph rejected: node n0 depends on unknown node(s) ['n1', 'n2', 'n3', 'n4']",
+        "repaired": "graph built, scene rejected: plan contains no manipulation: 1 node(s), all of them ['open_drawer'] "
+      }
+    }
+  ],
+  "verdicts": [
+    {
+      "seed": 0,
+      "identical_to_real": {
+        "none": false,
+        "blank": false,
+        "swapped": true
+      },
+      "digest_real": "33227de30e3d"
+    },
+    {
+      "seed": 1,
+      "identical_to_real": {
+        "none": false,
+        "blank": false,
+        "swapped": true
+      },
+      "digest_real": "33227de30e3d"
+    }
+  ],
+  "identical_across_all_seeds": {
+    "real_vs_none": false,
+    "real_vs_blank": false,
+    "real_vs_swapped": true
+  },
+  "prompt_digests": {
+    "0": "daa2690c3415",
+    "1": "daa2690c3415"
+  }
+}

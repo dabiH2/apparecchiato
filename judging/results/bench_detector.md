@@ -22,4 +22,6 @@
 
 - input shapes pinned to input_ids=(6, 16), attention_mask=(6, 16), pixel_values=(1, 3, 768, 768)
 - lowest latency: CPU @ native = 64.33 ms (p50)
-- No NPU device reported. On a Core Ultra this usually means the NPU driver is missing -- see Intel's Hack-a-thon Resources page.
+- device `CPU` is `AMD Ryzen AI 9 HX 370 w/ Radeon 890M`
+- device `GPU` is `NVIDIA GeForce RTX 4070 Laptop GPU (dGPU)`
+- No NPU device reported, and none is expected: the host is `AMD Ryzen AI 9 HX 370 w/ Radeon 890M`, which has no Intel NPU. This is not a driver problem and there is nothing to fix here -- the sweep enumerates whatever OpenVINO reports, and on a Core Ultra Series 2/3 the same command adds NPU and iGPU rows.

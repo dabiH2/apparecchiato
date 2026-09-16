@@ -15,12 +15,15 @@ import subprocess
 import sys
 
 TITLE = "set the table and pour me some water"
-SUB = "two SO-101 arms . VLM planner on OpenVINO . 100/100 randomised seeds"
+# NOTE: do not put "VLM planner" back in this line. The VLM's plan is rejected on every
+# seed and the README says so; the 100/100 is the deterministic fallback's. This string is
+# the one sentence a judge is guaranteed to read, so it must survive its own README.
+SUB = "two SO-101 arms . plans validated against physics . 100/100 seeds"
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--clip", default="out/eval_vlm/video/seed000.mp4")
+    ap.add_argument("--clip", default="out/eval_clips/video/seed000.mp4")
     ap.add_argument("--at", type=float, default=5.0, help="seconds into the clip")
     ap.add_argument("--out", default="out/cover.png")
     ap.add_argument("--width", type=int, default=1280)

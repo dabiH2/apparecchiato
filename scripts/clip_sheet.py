@@ -50,7 +50,7 @@ def main() -> int:
         hand = [s for s in steps if s.node.skill == "handoff"]
         ho = ", ".join(f"{s.node.args['object']} {s.arms[0]}->{s.arms[1]}" for s in hand)
         lines += [
-            f"## seed {seed:03d}  (`out/eval_vlm/video/seed{seed:03d}.mp4`)",
+            f"## seed {seed:03d}  (`out/eval_clips/video/seed{seed:03d}.mp4`)",
             "",
             f"- **{len(steps)} steps**, {parallel_fraction(steps):.0%} parallelisable",
             f"- **hand-off:** {ho or 'none'}"

@@ -81,7 +81,17 @@ patch density) did not change it.
 
 So the perception path that actually closes the loop is `ColourDetector`: HSV
 segmentation on the rendered frame, reading pixels with **no privileged simulator
-state**.
+state** *in the detector itself*. Two qualifications on that phrase, because it is
+the kind of claim that quietly becomes false one layer up (both are in the code,
+`executor._perceive`):
+
+1. **Only x and y come from pixels. z is taken from the object library.** A single
+   monocular view cannot recover height, so each blob is back-projected through its
+   object's *known* silhouette height. That height is privileged information.
+2. **An object the detector fails to find keeps its previous believed position**,
+   which on the first tick is ground truth. So a run with `--detector colour` is
+   perception-driven for what it sees, and oracle-backed for what it misses. Recall
+   below is therefore part of the result, not a footnote to it.
 
 | Object | Recall | Median error |
 | --- | --- | --- |
@@ -90,6 +100,18 @@ state**.
 | fork | 10/10 | 23 mm |
 | spoon | 10/10 | 46 mm |
 | plate | 10/10 | 87 mm |
+
+**Why this table and `results/eval_perception.md` disagree, and which one to
+believe.** The table above is the *static* case: one frame per seed, arms parked at
+home, objects untouched, median over 10 seeds. The eval reports measure the *in-loop*
+case: mean error over every perception tick of a running episode, with two arms
+moving through the overhead view, objects part-occluded by a gripper, and the drawer
+open. The same objects go from 87 → 141 mm (plate), 46 → 157 mm (spoon), 23 → 87 mm
+(fork). The static table is the detector's best case and the honest ceiling; the eval
+numbers are what the robot actually ran on and are the ones that decide the task.
+**Quote the eval numbers.** The gap between the two — roughly 1.6× to 3.8× — is
+occlusion and arm-in-frame, and it is the single largest reason the perception path
+does not clear the 45 mm placement tolerance.
 
 Three bugs were found getting there, and all three are the same shape -- something
 in the scene impersonating something else:
@@ -200,6 +222,62 @@ the scheduler, the deterministic planner takes over, and the episode runs.
 **A planner that fails does not stop the robot.** That is the property worth
 having on edge hardware, and it is why the validator boundary was built before
 the model was plugged in.
+
+### 5b. Is the vision tower contributing? (`scripts/vlm_ablation.py`)
+
+"Multi-modal" is a claim, and a claim that costs nothing to make is worth
+measuring. The experiment holds the instruction and the text scene description
+fixed and varies only the image, on seeds 0 and 1, comparing RAW generations
+rather than parsed plans:
+
+| Image | Result |
+| --- | --- |
+| this seed's overhead frame | the reference |
+| none | different output |
+| flat mid-grey | different again |
+| **another seed's overhead frame** | **byte-identical to the reference** |
+
+So the pixels do reach the model and do change what it writes -- this is not a
+wiring bug -- but swapping in a picture of a different table changes nothing.
+The vision tower is contributing something like *"a photograph of a table with
+objects on it"* and not *"the plate is at the far left"*.
+
+That is the same finding as section 4 arrived at from the other end, where
+OWLv2 on this scene lands 130-370 mm from truth, and it has the same cause:
+**untextured coloured primitives are out of distribution for vision encoders
+trained on natural photographs.** Two models, two architectures, one failure.
+
+The honest reading for anyone deploying this pattern: on a synthetic or
+low-texture scene, do not assume the vision half of a small VLM is grounding
+anything. Measure it -- it costs eight generations -- and if it is not, feed
+the model a *text* observation built from a detector you have characterised,
+which is what this system does.
+
+Two qualifications on the experiment, in `results/vlm_ablation.md`: on seeds 0
+and 1 the text prompts are byte-identical (`observation_text` names reachability
+classes, not millimetres), so the swap never put the image in conflict with the
+words -- the stronger version of this experiment needs two seeds whose text
+differs, and has not been run. And `run_eval.py` calls the planner with no
+image at all, so every committed eval run planned from text alone.
+
+### 5c. Repairing a plan instead of rejecting it
+
+Both failures this model actually commits are referential, not semantic: a
+dependency on a node it never wrote (`node n3 depends on unknown node(s)
+['n2']`), and a node whose skill came out empty (`unknown skill ''`). Neither is
+a wrong plan; both are bookkeeping, and both cost the whole episode's plan.
+
+`apparecchiato/planner/repair.py` fixes exactly those, under a boundary that is
+enforced in code rather than promised in prose: **it may delete instructions and
+reorder them; it may never add one.** `assert_nothing_invented` compares the
+fingerprint of every node before and after -- skill, arguments, arm -- and
+raises if anything appeared. `tests/test_plan_repair.py` pins that down,
+including that changing an argument or an arm counts as invention.
+
+Every repair is named in the plan's notes and therefore in the episode report,
+so a reader can see per seed how much of the executed plan was the model's. It
+is off by default (`--repair-vlm-plan`), because the committed numbers were
+produced without it and must keep reproducing exactly.
 
 ## 6. Device x precision latency
 

@@ -39,7 +39,7 @@ class TableEnv:
 
     def __init__(self, spec: SceneSpec, *, mjcf: str | None = None,
                  render_size: tuple[int, int] = (640, 480), substeps: int = 10,
-                 markers: bool = True):
+                 markers: bool = True, cinematic_eye=None, cinematic_target=None):
         try:
             import mujoco                                    # noqa: PLC0415
         except ImportError as exc:                           # pragma: no cover
@@ -47,7 +47,9 @@ class TableEnv:
         self._mj = mujoco
         self.spec = spec
         self.substeps = substeps
-        xml = mjcf if mjcf is not None else build_mjcf(spec, markers=markers)
+        xml = mjcf if mjcf is not None else build_mjcf(
+            spec, markers=markers,
+            cinematic_eye=cinematic_eye, cinematic_target=cinematic_target)
         self.model = mujoco.MjModel.from_xml_string(xml)
         self.data = mujoco.MjData(self.model)
         self.width, self.height = render_size

@@ -8,7 +8,7 @@
 **Task success: 70%** (7/10 seeds)
 
 - Mean steps per episode: 10.2
-- Mean wall clock per episode: 4.1 s execution + 0.0 s planning
+- Mean wall clock per episode: 7.3 s execution + 0.0 s planning
 - Parallelisable share of the plan: 64% (steps the dependency graph permits to overlap; the executor runs them one at a time)
 
 ## Which planner's output was executed
@@ -36,9 +36,12 @@ Every object the detector placed, and how far that was from the simulator's own 
 | mug_upright | 100% |
 | plate_placed | 100% |
 
-## First failure per failed seed
+## Every failed seed
 
-| Seed | Step | Detail |
-| --- | --- | --- |
-| 2 | [B] pick(object=mug) | lost the mug |
-| 8 | [B] pick(object=mug) | lost the mug |
+3 row(s) for 3 failed seed(s) — these two numbers must match, and the table below is keyed on seeds rather than on failing steps so that they do. A seed can run every step, have no step report a failure, and still not meet the task criterion; those are marked `end-state`.
+
+| Seed | Kind | Where | Detail |
+| --- | --- | --- | --- |
+| 2 | step | [B] pick(object=mug) | lost the mug |
+| 4 | end-state | end state (11 step(s) ran, none reported failure) | subgoals false at the end: bottle_upright |
+| 8 | step | [B] pick(object=mug) | lost the mug |

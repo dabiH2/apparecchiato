@@ -30,7 +30,7 @@ def caption(seed: int) -> str:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--clips", default="out/eval_vlm/video")
+    ap.add_argument("--clips", default="out/eval_clips/video")
     ap.add_argument("--seeds", default="0-9")
     ap.add_argument("--per-clip", type=float, default=3.0)
     ap.add_argument("--out", default="out/montage.mp4")

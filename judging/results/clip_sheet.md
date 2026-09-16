@@ -2,7 +2,7 @@
 
 Instruction: `Open the top drawer, set the plate, fork and spoon on the table, put the mug beside them and pour water into the mug.`
 
-## seed 000  (`out/eval_vlm/video/seed000.mp4`)
+## seed 000  (`out/eval_clips/video/seed000.mp4`)
 
 - **11 steps**, 64% parallelisable
 - **hand-off:** plate A->B at [0.008, 0.15, 0.008]
@@ -24,7 +24,7 @@ Instruction: `Open the top drawer, set the plate, fork and spoon on the table, p
 | 10 | A | place(object=spoon target=spoon) | same arm can finish the move |
 | 11 | B+A | pour(source=bottle into=mug) | explicitly requested |
 
-## seed 001  (`out/eval_vlm/video/seed001.mp4`)
+## seed 001  (`out/eval_clips/video/seed001.mp4`)
 
 - **11 steps**, 64% parallelisable
 - **hand-off:** plate A->B at [-0.011, 0.134, 0.009]
@@ -46,7 +46,7 @@ Instruction: `Open the top drawer, set the plate, fork and spoon on the table, p
 | 10 | A | place(object=spoon target=spoon) | same arm can finish the move |
 | 11 | B+A | pour(source=bottle into=mug) | explicitly requested |
 
-## seed 002  (`out/eval_vlm/video/seed002.mp4`)
+## seed 002  (`out/eval_clips/video/seed002.mp4`)
 
 - **11 steps**, 64% parallelisable
 - **hand-off:** plate A->B at [-0.035, 0.141, 0.008]
@@ -68,7 +68,7 @@ Instruction: `Open the top drawer, set the plate, fork and spoon on the table, p
 | 10 | A | place(object=spoon target=spoon) | same arm can finish the move |
 | 11 | B+A | pour(source=bottle into=mug) | explicitly requested |
 
-## seed 003  (`out/eval_vlm/video/seed003.mp4`)
+## seed 003  (`out/eval_clips/video/seed003.mp4`)
 
 - **11 steps**, 64% parallelisable
 - **hand-off:** plate A->B at [-0.013, 0.143, 0.008]
@@ -90,7 +90,7 @@ Instruction: `Open the top drawer, set the plate, fork and spoon on the table, p
 | 10 | A | place(object=spoon target=spoon) | same arm can finish the move |
 | 11 | B+A | pour(source=bottle into=mug) | explicitly requested |
 
-## seed 004  (`out/eval_vlm/video/seed004.mp4`)
+## seed 004  (`out/eval_clips/video/seed004.mp4`)
 
 - **11 steps**, 64% parallelisable
 - **hand-off:** plate A->B at [-0.019, 0.159, 0.008]
@@ -112,7 +112,7 @@ Instruction: `Open the top drawer, set the plate, fork and spoon on the table, p
 | 10 | A | place(object=spoon target=spoon) | same arm can finish the move |
 | 11 | B+A | pour(source=bottle into=mug) | explicitly requested |
 
-## seed 005  (`out/eval_vlm/video/seed005.mp4`)
+## seed 005  (`out/eval_clips/video/seed005.mp4`)
 
 - **11 steps**, 64% parallelisable
 - **hand-off:** plate A->B at [-0.026, 0.152, 0.008]
@@ -134,7 +134,7 @@ Instruction: `Open the top drawer, set the plate, fork and spoon on the table, p
 | 10 | A | place(object=spoon target=spoon) | same arm can finish the move |
 | 11 | B+A | pour(source=bottle into=mug) | explicitly requested |
 
-## seed 006  (`out/eval_vlm/video/seed006.mp4`)
+## seed 006  (`out/eval_clips/video/seed006.mp4`)
 
 - **11 steps**, 64% parallelisable
 - **hand-off:** plate A->B at [-0.003, 0.115, 0.009]
@@ -156,7 +156,7 @@ Instruction: `Open the top drawer, set the plate, fork and spoon on the table, p
 | 10 | A | place(object=spoon target=spoon) | same arm can finish the move |
 | 11 | B+A | pour(source=bottle into=mug) | explicitly requested |
 
-## seed 007  (`out/eval_vlm/video/seed007.mp4`)
+## seed 007  (`out/eval_clips/video/seed007.mp4`)
 
 - **11 steps**, 64% parallelisable
 - **hand-off:** plate A->B at [-0.02, 0.158, 0.009]
@@ -178,7 +178,7 @@ Instruction: `Open the top drawer, set the plate, fork and spoon on the table, p
 | 10 | A | place(object=spoon target=spoon) | same arm can finish the move |
 | 11 | B+A | pour(source=bottle into=mug) | explicitly requested |
 
-## seed 008  (`out/eval_vlm/video/seed008.mp4`)
+## seed 008  (`out/eval_clips/video/seed008.mp4`)
 
 - **11 steps**, 64% parallelisable
 - **hand-off:** plate A->B at [-0.004, 0.164, 0.008]
@@ -200,7 +200,7 @@ Instruction: `Open the top drawer, set the plate, fork and spoon on the table, p
 | 10 | A | place(object=spoon target=spoon) | same arm can finish the move |
 | 11 | B+A | pour(source=bottle into=mug) | explicitly requested |
 
-## seed 009  (`out/eval_vlm/video/seed009.mp4`)
+## seed 009  (`out/eval_clips/video/seed009.mp4`)
 
 - **11 steps**, 64% parallelisable
 - **hand-off:** plate A->B at [-0.024, 0.155, 0.009]

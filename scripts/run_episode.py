@@ -46,6 +46,11 @@ def main() -> int:
     ap.add_argument("--save-transcript", default=None, metavar="PATH",
                     help="write the Speechmatics result to JSON: final text, every "
                          "partial hypothesis, language, audio length, round trip")
+    ap.add_argument("--transcript-note", default=None,
+                    help="one line recorded in the transcript artifact saying "
+                         "where the audio came from. A transcript that does not "
+                         "say whether a human spoke is evidence of less than it "
+                         "looks like.")
     ap.add_argument("--max-seconds", type=float, default=180.0)
     args = ap.parse_args()
 
@@ -74,7 +79,10 @@ def main() -> int:
                        "partials": tr.partials,
                        "audio_seconds": round(tr.audio_seconds, 2),
                        "latency_s": round(tr.latency_s, 2),
-                       "provider": "Speechmatics real-time"}
+                       "provider": "Speechmatics real-time",
+                       "audio_source": args.voice_file if args.voice == "file" else "microphone",
+                       "audio_note": args.transcript_note,
+                       "server_info": tr.info}
             os.makedirs(os.path.dirname(args.save_transcript) or ".", exist_ok=True)
             with open(args.save_transcript, "w", encoding="utf-8") as fh:
                 json.dump(payload, fh, indent=2, ensure_ascii=False)

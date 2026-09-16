@@ -32,7 +32,7 @@ ITEMS: list[tuple[pathlib.Path, str]] = [
     (DOCS / "07-judge-simulation-prompt.md", "docs/07-judge-simulation-prompt.md"),
     (ROOT / "out/montage.mp4", "video/montage.mp4"),
     (ROOT / "out/cover.png", "video/cover.png"),
-    (ROOT / "out/eval_vlm/video/seed000.mp4", "video/one_full_episode_seed000.mp4"),
+    (ROOT / "out/eval_clips/video/seed000.mp4", "video/one_full_episode_seed000.mp4"),
 ]
 ITEMS += [(p, f"results/{p.name}") for p in sorted((ROOT / "results").glob("*"))
           if p.is_file()]

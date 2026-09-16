@@ -1,0 +1,247 @@
+{
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
+  "instruction": "Open the top drawer, set the plate, fork and spoon on the table, put the mug beside them and pour water into the mug.",
+  "planner": "vlm+rules",
+  "perception": "simulator state (no perception in the loop)",
+  "success_rate": 1.0,
+  "subgoal_rates": {
+    "bottle_upright": 1.0,
+    "drawer_open": 1.0,
+    "fork_placed": 1.0,
+    "mug_placed": 1.0,
+    "mug_upright": 1.0,
+    "plate_placed": 1.0,
+    "spoon_placed": 1.0
+  },
+  "mean_steps": 11.0,
+  "mean_wall_s": 5.009476979999453,
+  "mean_parallel_fraction": 0.6363636363636365,
+  "mean_plan_s": 97.82843790000042,
+  "plan_sources": {
+    "rules": 10
+  },
+  "failures": [],
+  "per_seed": [
+    {
+      "seed": 0,
+      "success": true,
+      "steps": 11,
+      "wall_s": 3.29,
+      "plan_s": 73.97,
+      "planner_source": "rules",
+      "planner_notes": [
+        "vlm failed: PlannerError: attempt 1: plan references objects that are not in the scene: ['water'] | attempt 2: plan picks ['fork', 'spoon'] and never places them -- the episode would end with them still in a gripper"
+      ],
+      "episode_notes": [],
+      "subgoals": {
+        "drawer_open": true,
+        "plate_placed": true,
+        "mug_placed": true,
+        "fork_placed": true,
+        "spoon_placed": true,
+        "mug_upright": true,
+        "bottle_upright": true
+      }
+    },
+    {
+      "seed": 1,
+      "success": true,
+      "steps": 11,
+      "wall_s": 3.35,
+      "plan_s": 62.87,
+      "planner_source": "rules",
+      "planner_notes": [
+        "vlm failed: PlannerError: attempt 1: plan references objects that are not in the scene: ['water'] | attempt 2: plan picks ['fork', 'spoon'] and never places them -- the episode would end with them still in a gripper"
+      ],
+      "episode_notes": [],
+      "subgoals": {
+        "drawer_open": true,
+        "plate_placed": true,
+        "mug_placed": true,
+        "fork_placed": true,
+        "spoon_placed": true,
+        "mug_upright": true,
+        "bottle_upright": true
+      }
+    },
+    {
+      "seed": 2,
+      "success": true,
+      "steps": 11,
+      "wall_s": 5.82,
+      "plan_s": 82.0,
+      "planner_source": "rules",
+      "planner_notes": [
+        "vlm failed: PlannerError: attempt 1: plan references objects that are not in the scene: ['water'] | attempt 2: plan picks ['fork', 'spoon'] and never places them -- the episode would end with them still in a gripper"
+      ],
+      "episode_notes": [],
+      "subgoals": {
+        "drawer_open": true,
+        "plate_placed": true,
+        "mug_placed": true,
+        "fork_placed": true,
+        "spoon_placed": true,
+        "mug_upright": true,
+        "bottle_upright": true
+      }
+    },
+    {
+      "seed": 3,
+      "success": true,
+      "steps": 11,
+      "wall_s": 5.81,
+      "plan_s": 125.23,
+      "planner_source": "rules",
+      "planner_notes": [
+        "vlm failed: PlannerError: attempt 1: plan references objects that are not in the scene: ['water'] | attempt 2: plan picks ['fork', 'spoon'] and never places them -- the episode would end with them still in a gripper"
+      ],
+      "episode_notes": [],
+      "subgoals": {
+        "drawer_open": true,
+        "plate_placed": true,
+        "mug_placed": true,
+        "fork_placed": true,
+        "spoon_placed": true,
+        "mug_upright": true,
+        "bottle_upright": true
+      }
+    },
+    {
+      "seed": 4,
+      "success": true,
+      "steps": 11,
+      "wall_s": 5.54,
+      "plan_s": 108.89,
+      "planner_source": "rules",
+      "planner_notes": [
+        "vlm failed: PlannerError: attempt 1: plan references objects that are not in the scene: ['water'] | attempt 2: plan picks ['fork', 'spoon'] and never places them -- the episode would end with them still in a gripper"
+      ],
+      "episode_notes": [],
+      "subgoals": {
+        "drawer_open": true,
+        "plate_placed": true,
+        "mug_placed": true,
+        "fork_placed": true,
+        "spoon_placed": true,
+        "mug_upright": true,
+        "bottle_upright": true
+      }
+    },
+    {
+      "seed": 5,
+      "success": true,
+      "steps": 11,
+      "wall_s": 5.95,
+      "plan_s": 104.66,
+      "planner_source": "rules",
+      "planner_notes": [
+        "vlm failed: PlannerError: attempt 1: plan references objects that are not in the scene: ['water'] | attempt 2: plan picks ['fork', 'spoon'] and never places them -- the episode would end with them still in a gripper"
+      ],
+      "episode_notes": [],
+      "subgoals": {
+        "drawer_open": true,
+        "plate_placed": true,
+        "mug_placed": true,
+        "fork_placed": true,
+        "spoon_placed": true,
+        "mug_upright": true,
+        "bottle_upright": true
+      }
+    },
+    {
+      "seed": 6,
+      "success": true,
+      "steps": 11,
+      "wall_s": 5.35,
+      "plan_s": 107.57,
+      "planner_source": "rules",
+      "planner_notes": [
+        "vlm failed: PlannerError: attempt 1: plan references objects that are not in the scene: ['water'] | attempt 2: plan picks ['fork', 'spoon'] and never places them -- the episode would end with them still in a gripper"
+      ],
+      "episode_notes": [],
+      "subgoals": {
+        "drawer_open": true,
+        "plate_placed": true,
+        "mug_placed": true,
+        "fork_placed": true,
+        "spoon_placed": true,
+        "mug_upright": true,
+        "bottle_upright": true
+      }
+    },
+    {
+      "seed": 7,
+      "success": true,
+      "steps": 11,
+      "wall_s": 4.14,
+      "plan_s": 108.4,
+      "planner_source": "rules",
+      "planner_notes": [
+        "vlm failed: PlannerError: attempt 1: plan references objects that are not in the scene: ['water'] | attempt 2: plan picks ['fork', 'spoon'] and never places them -- the episode would end with them still in a gripper"
+      ],
+      "episode_notes": [],
+      "subgoals": {
+        "drawer_open": true,
+        "plate_placed": true,
+        "mug_placed": true,
+        "fork_placed": true,
+        "spoon_placed": true,
+        "mug_upright": true,
+        "bottle_upright": true
+      }
+    },
+    {
+      "seed": 8,
+      "success": true,
+      "steps": 11,
+      "wall_s": 5.34,
+      "plan_s": 101.92,
+      "planner_source": "rules",
+      "planner_notes": [
+        "vlm failed: PlannerError: attempt 1: plan references objects that are not in the scene: ['water'] | attempt 2: plan picks ['fork', 'spoon'] and never places them -- the episode would end with them still in a gripper"
+      ],
+      "episode_notes": [],
+      "subgoals": {
+        "drawer_open": true,
+        "plate_placed": true,
+        "mug_placed": true,
+        "fork_placed": true,
+        "spoon_placed": true,
+        "mug_upright": true,
+        "bottle_upright": true
+      }
+    },
+    {
+      "seed": 9,
+      "success": true,
+      "steps": 11,
+      "wall_s": 5.5,
+      "plan_s": 102.78,
+      "planner_source": "rules",
+      "planner_notes": [
+        "vlm failed: PlannerError: attempt 1: plan references objects that are not in the scene: ['water'] | attempt 2: plan picks ['fork', 'spoon'] and never places them -- the episode would end with them still in a gripper"
+      ],
+      "episode_notes": [],
+      "subgoals": {
+        "drawer_open": true,
+        "plate_placed": true,
+        "mug_placed": true,
+        "fork_placed": true,
+        "spoon_placed": true,
+        "mug_upright": true,
+        "bottle_upright": true
+      }
+    }
+  ]
+}

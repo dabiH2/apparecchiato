@@ -280,12 +280,28 @@ def _look_at(eye, target) -> list[float]:
 # The cinematic shot, as an eye and a point to look at rather than six numbers.
 # Slightly off-axis so both arms have depth, close enough that the table fills
 # the frame, and aimed just in front of the place setting.
-CINEMATIC_EYE = (0.30, -0.30, 0.34)
-CINEMATIC_TARGET = (-0.01, 0.15, 0.03)
+#
+# This used to be (0.30, -0.30, 0.34) and it was wrong in a way nobody could see
+# from the numbers. Arm B is bolted at x = +0.12, so a camera at x = +0.30 looks
+# straight down B's own column at everything in the shared lens -- which is where
+# the pour happens, the one step in the whole episode with both arms moving at
+# once. Measured with scripts/find_pour_camera.py at the moment of `pour:tip`:
+#
+#     eye                    mug visible   bottle visible
+#     (0.30,-0.30,0.34)       637 px           0 px       <- the old shot, seed 0
+#     (0.30,-0.30,0.34)         0 px          35 px       <- the old shot, seed 3
+#     (0.10,-0.42,0.40)      1455 px         490 px       <- this one, seed 0
+#
+# Zero pixels of the bottle. The demo video was showing a robot arm standing in
+# front of the thing the robot was doing. Lower and further forward puts both
+# arms in profile, converging on the mug, with the laid setting in front of them.
+CINEMATIC_EYE = (0.10, -0.42, 0.40)
+CINEMATIC_TARGET = (-0.01, 0.16, 0.04)
 
 
 def build_mjcf(spec: SceneSpec, *, timestep: float = 0.002,
-               markers: bool = True) -> str:
+               markers: bool = True,
+               cinematic_eye=None, cinematic_target=None) -> str:
     root = ET.Element("mujoco", model=f"apparecchiato_seed{spec.seed}")
     _e(root, "compiler", angle="radian", autolimits="true")
     # Offscreen framebuffer big enough for a detector-sized render. MuJoCo's
@@ -335,8 +351,14 @@ def build_mjcf(spec: SceneSpec, *, timestep: float = 0.002,
     _e(world, "camera", name="front", pos=[0, -0.34, 0.30], xyaxes=[1, 0, 0, 0, 0.55, 0.84],
        fovy=55)
     _e(world, "camera", name="wrist_a", pos=[0, 0, 0], euler=[0, 0, 0], fovy=70)
-    _e(world, "camera", name="cinematic", pos=list(CINEMATIC_EYE),
-       xyaxes=_look_at(CINEMATIC_EYE, CINEMATIC_TARGET), fovy=46)
+    # The cinematic eye and target are overridable so a shot can be CHOSEN by
+    # looking at candidates rather than argued about. scripts/find_pour_camera.py
+    # sweeps them and measures how much of the pour each one hides behind an
+    # arm's own column -- which is how the default below was picked.
+    eye = tuple(cinematic_eye if cinematic_eye is not None else CINEMATIC_EYE)
+    target = tuple(cinematic_target if cinematic_target is not None else CINEMATIC_TARGET)
+    _e(world, "camera", name="cinematic", pos=list(eye),
+       xyaxes=_look_at(eye, target), fovy=46)
 
     # The arms are deliberately dark and desaturated, and deliberately NOT blue.
     # Arm A used to be [0.30, 0.48, 0.78] -- 0.06 away from the mug's blue in RGB

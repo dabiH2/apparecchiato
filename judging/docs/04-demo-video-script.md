@@ -19,8 +19,14 @@ graph renders. Then both arms start moving. No title card, no logo, no "hi, I'm�
 
 Voice-over, over the motion:
 
-> "No script. The plan you just saw was written by the model, and checked against the
-> geometry of the table before a single joint moved."
+> "The model wrote a plan. The validator rejected it. The fallback finished the job before
+> a joint moved — and that is the point."
+
+**This is the corrected hook. Do not revert it.** The earlier line ("the plan you just saw
+was written by the model") is false on every seed in this repo and the README says so; a
+judge who checks finds the submission contradicting itself in the first ten seconds, which
+is the most expensive place to be caught. The replacement is also the stronger claim — it
+states the thesis of the whole project rather than a capability nobody demonstrated.
 
 ---
 
@@ -63,13 +69,30 @@ Voice-over:
 
 > "Ten randomised seeds. Different placements, masses, frictions, object sizes, lighting
 > and backgrounds — same instruction, same code, no per-scene tuning. Ten out of ten. And
-> a hundred seeds, of which we only ever looked at the first ten: a hundred out of a
-> hundred, eleven steps of eleven, every time."
+> across a hundred seeds: a hundred out of a hundred, eleven steps of eleven, every time —
+> on seeds screened for reachability, at a forty-five millimetre placement tolerance."
 
-Clips are already rendered: `out/eval_vlm/video/seed000.mp4` … `seed009.mp4`, recorded from
-the cinematic camera during the `vlm+rules` run that produced
-`results/eval_vlm_seeds0-9.md`. Re-render with
-`python scripts/run_eval.py --seeds 0-9 --planner vlm+rules --out out/eval_vlm --camera cinematic`.
+The clause "of which we only ever looked at the first ten" is **cut** (audit-allow): the README retracts
+it (three fixes were chosen by counting failures across all hundred), and a video that says
+something the README takes back is a free contradiction. The screening-and-tolerance clause
+is deliberate — it costs two seconds and removes the most obvious hostile follow-up.
+
+Clips are already rendered: `out/eval_clips/video/seed000.mp4` … `seed009.mp4`, 10/10,
+recorded from the **corrected** cinematic camera with markers off. Re-render with
+`python scripts/run_eval.py --seeds 0-9 --planner rules --out out/eval_clips --camera cinematic --no-markers`.
+
+**The camera moved, and it matters.** The old shot sat at x = +0.30; arm B is bolted at
+x = +0.12, so it looked straight down B's own column at the shared lens — where the pour
+happens. Measured at the instant of `pour:tip` with `scripts/find_pour_camera.py`: on seed 0
+the old camera showed 637 px of mug and **zero pixels of the bottle**; on seed 3, **zero
+pixels of the mug**. The demo was showing an arm standing in front of the thing the robot
+was doing. The new eye (0.10, −0.42, 0.40) shows 1455 px of mug and 490 px of bottle, with
+both arms in profile converging on it. That is the "hold two beats on the pour" shot — it
+now has something to hold on.
+
+These clips are from the `rules` planner, not `vlm+rules`. Say "the deterministic planner"
+if the provenance comes up: the VLM is rejected on every seed either way, so the executed
+plan is identical, but the file is what it is and the caption should match it.
 
 Then hold the subgoal table on screen for three seconds.
 
@@ -92,7 +115,10 @@ Screen recording, not slides.
 
 Voice-over:
 
-> "The planner is a 2B vision-language model at INT4. The detector is INT8. The control
+> "The planner is a 2B vision-language model exported to INT4. The detector is exported to
+> INT8 — and benchmarked, but not in the loop: on untextured primitives it is a hundred and
+> thirty millimetres off, so a classical colour detector closes the loop instead. Say that
+> rather than let it be found. The control
 > loop stays fp32 on CPU, where it costs microseconds and quantising would only add risk.
 > The benchmark sweeps every device against every precision, and prints the CPU it ran on —
 > which here is an AMD Ryzen, because we did not have Core Ultra hardware. The export path
@@ -133,7 +159,20 @@ One slide, four lines, six seconds:
 - Emergent hand-offs from workspace geometry, not scripts
 - Validated plans: physically impossible ones are rejected before execution
 - OpenVINO INT4 planner + INT8 detector, exported and swept on CPU (AMD host — say so)
-- 208 tests, reproducible in one command
+- 221 tests, reproducible in one command
+
+**One extra shot, ten seconds, worth more than any of the four lines above.** Immediately
+after the close slide, show the VLM ablation from `results/vlm_ablation.md` on screen: the
+same planner called on the real scene, on a blank image, and on another seed's image, with
+the three outputs diffed. Voice-over:
+
+> "One last thing, because it is the question we would ask. We fed the planner a blank
+> image and a wrong image. The output does not change. So on this task, at this size, the
+> vision half of the vision-language model is not contributing — and we would rather
+> measure that and tell you than ship a diagram that implies otherwise."
+
+A judge who was going to find this scores it as a fatal overclaim. A judge who is handed it,
+measured, scores it as rigour. It is the same fact.
 
 Then: repo URL on screen, held for five full seconds.
 

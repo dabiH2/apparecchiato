@@ -13,7 +13,7 @@
   ],
   "instruction": "Open the top drawer, set the plate, fork and spoon on the table, put the mug beside them and pour water into the mug.",
   "planner": "rules",
-  "perception": "colour",
+  "perception": "colour detector",
   "success_rate": 0.0,
   "subgoal_rates": {
     "bottle_upright": 1.0,
@@ -25,60 +25,70 @@
     "spoon_placed": 0.0
   },
   "mean_steps": 5.5,
-  "mean_wall_s": 1.3990057000002707,
+  "mean_wall_s": 2.447457100000611,
   "mean_parallel_fraction": 0.6363636363636365,
-  "mean_plan_s": 0.0006990799993218388,
+  "mean_plan_s": 0.001243639999665902,
   "plan_sources": {
     "rules": 10
   },
   "failures": [
     {
       "seed": 0,
+      "kind": "step",
       "label": "[A] pick(object=plate)",
       "detail": "lost the plate"
     },
     {
       "seed": 1,
+      "kind": "step",
       "label": "[A] pick(object=plate)",
       "detail": "lost the plate"
     },
     {
       "seed": 2,
+      "kind": "step",
       "label": "[B] pick(object=mug)",
       "detail": "lost the mug"
     },
     {
       "seed": 3,
+      "kind": "step",
       "label": "[B] place(object=mug target=mug)",
       "detail": "mug landed 189 mm from its slot"
     },
     {
       "seed": 4,
+      "kind": "step",
       "label": "[A] pick(object=plate)",
       "detail": "could not build motion: arm A has no clearance above pre-pick-plate at [-0.131, 0.498, 0.009] (tried 2-8 cm)"
     },
     {
       "seed": 5,
+      "kind": "step",
       "label": "[A] pick(object=spoon)",
       "detail": "could not build motion: arm A cannot reach pick-spoon at [-0.049, 0.116, 0.023]: target outside the reachable workspace for this pitch"
     },
     {
       "seed": 6,
+      "kind": "step",
       "label": "[A] pick(object=spoon)",
       "detail": "could not build motion: arm A cannot reach pick-spoon at [-0.06, 0.124, 0.023]: target outside the reachable workspace for this pitch"
     },
     {
       "seed": 7,
+      "kind": "step",
       "label": "[A] pick(object=fork)",
       "detail": "could not build motion: arm A has no clearance above pre-pick-fork at [0.01, 0.487, 0.023] (tried 2-8 cm)"
     },
     {
       "seed": 8,
+      "kind": "step",
       "label": "[A] pick(object=plate)",
       "detail": "lost the plate"
     },
     {
       "seed": 9,
+      "kind": "step",
       "label": "[A] pick(object=spoon)",
       "detail": "could not build motion: arm A cannot reach pick-spoon at [-0.047, 0.116, 0.023]: target outside the reachable workspace for this pitch"
     }
@@ -88,7 +98,7 @@
       "seed": 0,
       "success": false,
       "steps": 2,
-      "wall_s": 0.69,
+      "wall_s": 1.54,
       "plan_s": 0.0,
       "planner_source": "rules",
       "planner_notes": [],
@@ -120,7 +130,7 @@
       "seed": 1,
       "success": false,
       "steps": 2,
-      "wall_s": 0.58,
+      "wall_s": 0.93,
       "plan_s": 0.0,
       "planner_source": "rules",
       "planner_notes": [],
@@ -152,7 +162,7 @@
       "seed": 2,
       "success": false,
       "steps": 7,
-      "wall_s": 2.07,
+      "wall_s": 3.06,
       "plan_s": 0.0,
       "planner_source": "rules",
       "planner_notes": [],
@@ -206,7 +216,7 @@
       "seed": 3,
       "success": false,
       "steps": 8,
-      "wall_s": 2.16,
+      "wall_s": 3.69,
       "plan_s": 0.0,
       "planner_source": "rules",
       "planner_notes": [],
@@ -265,7 +275,7 @@
       "seed": 4,
       "success": false,
       "steps": 2,
-      "wall_s": 0.37,
+      "wall_s": 0.75,
       "plan_s": 0.0,
       "planner_source": "rules",
       "planner_notes": [],
@@ -293,7 +303,7 @@
       "seed": 5,
       "success": false,
       "steps": 9,
-      "wall_s": 2.13,
+      "wall_s": 3.79,
       "plan_s": 0.0,
       "planner_source": "rules",
       "planner_notes": [],
@@ -352,7 +362,7 @@
       "seed": 6,
       "success": false,
       "steps": 9,
-      "wall_s": 2.12,
+      "wall_s": 3.46,
       "plan_s": 0.0,
       "planner_source": "rules",
       "planner_notes": [],
@@ -411,7 +421,7 @@
       "seed": 7,
       "success": false,
       "steps": 5,
-      "wall_s": 1.22,
+      "wall_s": 2.16,
       "plan_s": 0.0,
       "planner_source": "rules",
       "planner_notes": [],
@@ -452,7 +462,7 @@
       "seed": 8,
       "success": false,
       "steps": 2,
-      "wall_s": 0.57,
+      "wall_s": 0.93,
       "plan_s": 0.0,
       "planner_source": "rules",
       "planner_notes": [],
@@ -484,7 +494,7 @@
       "seed": 9,
       "success": false,
       "steps": 9,
-      "wall_s": 2.08,
+      "wall_s": 4.17,
       "plan_s": 0.0,
       "planner_source": "rules",
       "planner_notes": [],

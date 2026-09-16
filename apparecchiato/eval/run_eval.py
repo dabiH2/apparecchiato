@@ -57,6 +57,10 @@ class EvalSummary:
             f"- Instruction: `{self.instruction}`",
             f"- Planner: `{self.planner}`",
             f"- Object positions from: **{self.perception}**",
+            f"- Plan repair: **{'ON' if os.environ.get('APPARECCHIATO_VLM_REPAIR') == '1' else 'off'}**"
+            f" (`--repair-vlm-plan`: the validator may delete and reorder what the "
+            f"model wrote, and may never add to it; every repair is named in the "
+            f"per-episode notes)",
             f"- Seeds: {self.seeds}",
             "",
             f"**Task success: {self.success_rate:.0%}** "
@@ -116,10 +120,19 @@ class EvalSummary:
         for k, v in sorted(self.subgoal_rates.items(), key=lambda kv: kv[1]):
             lines.append(f"| {k} | {v:.0%} |")
         if self.failures:
-            lines += ["", "## First failure per failed seed", "",
-                      "| Seed | Step | Detail |", "| --- | --- | --- |"]
+            n_fail = sum(1 for s in self.per_seed if not s.get("success")) \
+                if self.per_seed else len(self.failures)
+            lines += ["", "## Every failed seed", "",
+                      f"{len(self.failures)} row(s) for {n_fail} failed seed(s) — "
+                      "these two numbers must match, and the table below is keyed on "
+                      "seeds rather than on failing steps so that they do. A seed can "
+                      "run every step, have no step report a failure, and still not "
+                      "meet the task criterion; those are marked `end-state`.",
+                      "",
+                      "| Seed | Kind | Where | Detail |", "| --- | --- | --- | --- |"]
             for f in self.failures:
-                lines.append(f"| {f['seed']} | {f['label']} | {f['detail']} |")
+                lines.append(f"| {f['seed']} | {f.get('kind', 'step')} | "
+                             f"{f['label']} | {f['detail']} |")
         return "\n".join(lines)
 
 
@@ -189,9 +202,16 @@ def evaluate(seeds=range(10), *, instruction: str = DEFAULT_INSTRUCTION,
         mean_steps=float(np.mean([len(r.steps) for r in reports])) if reports else 0.0,
         mean_wall_s=float(np.mean([r.wall_s for r in reports])) if reports else 0.0,
         mean_parallel_fraction=float(np.mean(pfracs)) if pfracs else 0.0,
-        failures=[{"seed": r.seed, "label": r.first_failure.label,
-                   "detail": r.first_failure.detail}
-                  for r in reports if not r.success and r.first_failure],
+        # EVERY unsuccessful seed appears here, including the ones that have no
+        # `first_failure`. A seed can run all eleven steps, have every step report
+        # success, and still fail the task -- the bottle ends up on its side, or an
+        # object drifts out of tolerance after the gripper lets go. Those have no
+        # failing STEP, so keying this list on `first_failure` silently dropped them:
+        # the perception report listed two rows for three failed seeds, which makes
+        # the table look like it is hiding something even though the summary line
+        # above it was right. End-state failures are labelled as such and name the
+        # subgoals that were false at the end.
+        failures=[_failure_row(r) for r in reports if not r.success],
         mean_plan_s=float(np.mean(plan_s)) if plan_s else 0.0,
         plan_sources={s: sources.count(s) for s in sorted(set(sources))},
         per_seed=[{"seed": r.seed, "success": r.success, "steps": len(r.steps),
@@ -200,6 +220,28 @@ def evaluate(seeds=range(10), *, instruction: str = DEFAULT_INSTRUCTION,
                    "episode_notes": r.notes, "subgoals": r.subgoals}
                   for r, p, src, notes in zip(reports, plan_s, sources, plan_notes)],
     )
+
+
+def _failure_row(rep: EpisodeReport) -> dict:
+    """One row per failed seed, whether or not a step reported the failure.
+
+    Two shapes of failure exist and both have to be visible:
+
+      step       a skill reported failure mid-episode; `first_failure` names it.
+      end-state  every step succeeded and the task is still not done. This is
+                 what an unstable bottle or a post-release drift looks like, and
+                 it is the more interesting of the two, because the executor's
+                 own per-step verification did not catch it.
+    """
+    if rep.first_failure is not None:
+        return {"seed": rep.seed, "kind": "step",
+                "label": rep.first_failure.label,
+                "detail": rep.first_failure.detail}
+    unmet = sorted(k for k, v in rep.subgoals.items() if not v)
+    return {"seed": rep.seed, "kind": "end-state",
+            "label": f"end state ({len(rep.steps)} step(s) ran, none reported failure)",
+            "detail": ("subgoals false at the end: " + ", ".join(unmet)) if unmet
+                      else "no subgoal was false; success criterion not met"}
 
 
 def _write_frames(rep: EpisodeReport, record_dir: str, seed: int) -> None:

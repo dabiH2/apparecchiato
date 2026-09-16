@@ -1,0 +1,115 @@
+{
+  "host": {
+    "cpu": "AMD Ryzen AI 9 HX 370 w/ Radeon 890M",
+    "os": "Windows 11",
+    "python": "3.12.10",
+    "devices": {
+      "CPU": "AMD Ryzen AI 9 HX 370 w/ Radeon 890M           ",
+      "GPU": "NVIDIA GeForce RTX 4070 Laptop GPU (dGPU)"
+    }
+  },
+  "is_core_ultra": false,
+  "core_ultra_series_2_3": false,
+  "openvino_version": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+  "available_devices": [
+    "CPU",
+    "GPU"
+  ],
+  "results": [
+    {
+      "device": "CPU",
+      "precision": "native",
+      "ok": true,
+      "latency_ms_p50": 64.3336499997531,
+      "latency_ms_p95": 66.76379999953497,
+      "throughput_fps": 15.543964939092337,
+      "first_infer_ms": 74.60960000025807,
+      "iterations": 20,
+      "error": ""
+    },
+    {
+      "device": "CPU",
+      "precision": "f32",
+      "ok": true,
+      "latency_ms_p50": 78.74655000068742,
+      "latency_ms_p95": 100.90380000110599,
+      "throughput_fps": 12.698969034088103,
+      "first_infer_ms": 82.90220000162662,
+      "iterations": 20,
+      "error": ""
+    },
+    {
+      "device": "CPU",
+      "precision": "f16",
+      "ok": true,
+      "latency_ms_p50": 69.31854999947973,
+      "latency_ms_p95": 77.36660000045958,
+      "throughput_fps": 14.426152884148696,
+      "first_infer_ms": 64.88440000066475,
+      "iterations": 20,
+      "error": ""
+    },
+    {
+      "device": "CPU",
+      "precision": "bf16",
+      "ok": true,
+      "latency_ms_p50": 82.13905000047816,
+      "latency_ms_p95": 88.6302999988402,
+      "throughput_fps": 12.174477303964176,
+      "first_infer_ms": 66.93140000061248,
+      "iterations": 20,
+      "error": ""
+    },
+    {
+      "device": "GPU",
+      "precision": "native",
+      "ok": true,
+      "latency_ms_p50": 722.2358500011978,
+      "latency_ms_p95": 724.8955999984901,
+      "throughput_fps": 1.3845892584788493,
+      "first_infer_ms": 848.0865999990783,
+      "iterations": 20,
+      "error": ""
+    },
+    {
+      "device": "GPU",
+      "precision": "f32",
+      "ok": true,
+      "latency_ms_p50": 722.7819999998246,
+      "latency_ms_p95": 731.7432999989251,
+      "throughput_fps": 1.3835430323392706,
+      "first_infer_ms": 724.6202000005724,
+      "iterations": 20,
+      "error": ""
+    },
+    {
+      "device": "GPU",
+      "precision": "f16",
+      "ok": true,
+      "latency_ms_p50": 723.9734000004319,
+      "latency_ms_p95": 726.647999999841,
+      "throughput_fps": 1.3812662177911557,
+      "first_infer_ms": 725.0703000008798,
+      "iterations": 20,
+      "error": ""
+    },
+    {
+      "device": "GPU",
+      "precision": "bf16",
+      "ok": false,
+      "latency_ms_p50": 0.0,
+      "latency_ms_p95": 0.0,
+      "throughput_fps": 0.0,
+      "first_infer_ms": 0.0,
+      "iterations": 0,
+      "error": "RuntimeError: Exception from src\\inference\\src\\cpp\\core.cpp:120:\nException from src\\inference\\src\\dev\\plugin.cpp:54:\nException from src\\inference\\src\\dev\\plugin_config.cpp:95:\nInvalid value: bf16 for property: INFERENCE_PRECISION_HINT\nProperty description: Model floating-point inference precision. Supported values: { f16, f32, dynamic }\n\n\n"
+    }
+  ],
+  "notes": [
+    "input shapes pinned to input_ids=(6, 16), attention_mask=(6, 16), pixel_values=(1, 3, 768, 768)",
+    "lowest latency: CPU @ native = 64.33 ms (p50)",
+    "device `CPU` is `AMD Ryzen AI 9 HX 370 w/ Radeon 890M`",
+    "device `GPU` is `NVIDIA GeForce RTX 4070 Laptop GPU (dGPU)`",
+    "No NPU device reported, and none is expected: the host is `AMD Ryzen AI 9 HX 370 w/ Radeon 890M`, which has no Intel NPU. This is not a driver problem and there is nothing to fix here -- the sweep enumerates whatever OpenVINO reports, and on a Core Ultra Series 2/3 the same command adds NPU and iGPU rows."
+  ]
+}

@@ -254,14 +254,47 @@ def benchmark(model_path: str, *, devices=None, precisions=("native", "f32", "f1
             # will and will not run.
             report.results.append(_bench_one(core, model, d, p, iterations, warmup))
 
+    finalise_notes(report, available)
+    return report
+
+
+def finalise_notes(report: "BenchReport", available=None) -> "BenchReport":
+    """Derive the report's Notes section from its own data.
+
+    Separated from the sweep so that a committed `bench_report.json` can be
+    re-rendered to markdown without re-running the benchmark, and so the two can
+    never say different things. `scripts/rerender_bench.py` is the other caller.
+    """
+    available = list(available if available is not None else report.available_devices)
+    report.notes = [n for n in report.notes
+                    if not n.startswith(("lowest latency", "device `", "No NPU"))]
+
     ok = [r for r in report.results if r.ok]
     if ok:
         best = min(ok, key=lambda r: r.latency_ms_p50)
         report.notes.append(
             f"lowest latency: {best.device} @ {best.precision} "
             f"= {best.latency_ms_p50:.2f} ms (p50)")
+    # Name every device the table actually used, by its real product string. A
+    # row labelled "GPU" that is an NVIDIA dGPU reads as an Intel iGPU to anyone
+    # skimming, and that is the most expensive kind of ambiguity in this report.
+    for dev, name in sorted((report.host.get("devices") or {}).items()):
+        report.notes.append(f"device `{dev}` is `{str(name).strip()}`")
+
     if "NPU" not in available:
-        report.notes.append(
-            "No NPU device reported. On a Core Ultra this usually means the NPU "
-            "driver is missing -- see Intel's Hack-a-thon Resources page.")
+        # Say which of the two reasons applies rather than assuming the Core
+        # Ultra one. Reporting "the driver is probably missing" on a host that
+        # has no NPU at all invites a judge to read the whole sweep as a
+        # misconfigured Intel box instead of a correctly-labelled non-Intel one.
+        if report.is_core_ultra:
+            report.notes.append(
+                "No NPU device reported on a Core Ultra host -- this usually means "
+                "the NPU driver is missing; see Intel's Hack-a-thon Resources page.")
+        else:
+            report.notes.append(
+                f"No NPU device reported, and none is expected: the host is "
+                f"`{report.host.get('cpu', 'unknown')}`, which has no Intel NPU. "
+                "This is not a driver problem and there is nothing to fix here -- "
+                "the sweep enumerates whatever OpenVINO reports, and on a Core "
+                "Ultra Series 2/3 the same command adds NPU and iGPU rows.")
     return report

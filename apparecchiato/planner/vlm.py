@@ -34,13 +34,20 @@ class VLMPlanner(Planner):
 
     def __init__(self, backend: str | None = None, model: str | None = None,
                  device: str | None = None, max_new_tokens: int = 768,
-                 temperature: float = 0.0, max_attempts: int = 2):
+                 temperature: float = 0.0, max_attempts: int = 2,
+                 repair: bool | None = None):
         self.backend = backend or os.environ.get("APPARECCHIATO_VLM_BACKEND", "auto")
         self.model = model or DEFAULT_OV_MODEL
         self.device = device or DEFAULT_OV_DEVICE
         self.max_new_tokens = max_new_tokens
         self.temperature = temperature
         self.max_attempts = max(1, int(max_attempts))
+        # Referential repair of the model's own plan: off unless asked for, so
+        # that every previously committed number still reproduces exactly. See
+        # apparecchiato/planner/repair.py for what it may and may not touch.
+        self.repair = (bool(int(os.environ.get("APPARECCHIATO_VLM_REPAIR", "0")))
+                       if repair is None else bool(repair))
+        self.last_repairs: list[str] = []
         self._pipe = None
         self._processor = None
         self.last_latency_s: float | None = None
@@ -97,6 +104,12 @@ class VLMPlanner(Planner):
             notes.append(f"{self.last_dropped} node(s) were unparseable and dropped")
         if attempt:
             notes.append(f"accepted on attempt {attempt + 1} after feedback")
+        # Every repair is named in the plan's own notes, so the eval report says
+        # per episode how much of the executed plan was the model's. A repair
+        # that is not reported is indistinguishable from writing the plan for it.
+        notes += list(self.last_repairs)
+        if self.repair and not self.last_repairs:
+            notes.append("plan repair was enabled and changed nothing")
         graph = TaskGraph(instruction, nodes, source=f"vlm:{self.last_backend}",
                           notes=notes)
         validate_against_scene(graph, scene)
@@ -266,8 +279,23 @@ class VLMPlanner(Planner):
             raise PlannerError("model output has no 'nodes' list")
         if not data["nodes"]:
             raise PlannerError("model returned an empty plan")
+
+        self.last_repairs = []
+        raw_nodes = data["nodes"]
+        if self.repair:
+            # Two of this model's failures are bookkeeping, not intent: a node
+            # whose skill came out empty, and a dep pointing at a node it never
+            # wrote. Both make the graph unconstructible and neither says
+            # anything about whether the plan is a good one, so they are removed
+            # here -- and every removal is recorded and ends up in the report.
+            from .repair import sanitise_nodes                   # noqa: PLC0415
+            raw_nodes, notes = sanitise_nodes(raw_nodes)
+            self.last_repairs += notes
+            if not raw_nodes:
+                raise PlannerError("no node named a known skill; nothing to repair")
+
         nodes = []
-        for i, n in enumerate(data["nodes"]):
+        for i, n in enumerate(raw_nodes):
             if not isinstance(n, dict) or "skill" not in n:
                 raise PlannerError(f"node {i} is malformed: {n!r}")
             nodes.append(Node(
@@ -279,6 +307,30 @@ class VLMPlanner(Planner):
                 deps=[str(d).strip() for d in (n.get("deps") or [])],
                 rationale=str(n.get("rationale", "")),
             ))
+
+        if self.repair:
+            from .repair import (assert_nothing_invented,          # noqa: PLC0415
+                                 assert_repair_was_a_minority,
+                                 break_cycles, prune_dangling_deps)
+            import copy                                           # noqa: PLC0415
+            # Repair is for a plan with mistakes in it, not for wreckage with a
+            # plan in it. `last_dropped` counts what salvage threw away upstream
+            # when the JSON would not parse; together with the nodes dropped
+            # here, it says how much of the answer was noise.
+            try:
+                assert_repair_was_a_minority(
+                    kept=len(nodes),
+                    dropped=self.last_dropped + (len(data["nodes"]) - len(raw_nodes)))
+            except ValueError as exc:
+                raise PlannerError(str(exc)) from exc
+            before = copy.deepcopy(nodes)
+            self.last_repairs += prune_dangling_deps(nodes)
+            self.last_repairs += break_cycles(nodes)
+            # The load-bearing check, not a comment: the repair is only allowed
+            # to delete instructions and reorder them. If it ever adds one, the
+            # executed plan stopped being the model's and the claim would be a
+            # lie, so this raises rather than warns.
+            assert_nothing_invented(before, nodes)
         return nodes
 
 
@@ -305,10 +357,36 @@ def validate_against_scene(graph: TaskGraph, scene) -> None:
                 raise PlannerError(
                     f"plan picks {n.args['object']} before opening the drawer")
 
+    # A plan has to move something. `open_drawer` and `home` change no object's
+    # pose, so a graph made only of those is not an attempt at the task -- it is
+    # what is left when a generation collapsed and the tail never arrived. Cheap
+    # to check, and it is the difference between the deterministic planner taking
+    # the episode and a robot opening a drawer and calling it done.
+    if not any(n.skill in ("pick", "place", "handoff", "pour") for n in graph.nodes):
+        raise PlannerError(
+            f"plan contains no manipulation: {len(graph.nodes)} node(s), all of them "
+            f"{sorted({n.skill for n in graph.nodes})} -- nothing is ever moved")
+
     held_by_a_pick = {n.args["object"] for n in graph.nodes if n.skill == "pick"}
     for n in graph.nodes:
         if n.skill == "place" and n.args["object"] not in held_by_a_pick:
             raise PlannerError(f"plan places {n.args['object']} without ever picking it")
+
+    # ...and the mirror of it, which matters more. A plan that picks an object and
+    # never puts it down leaves it in a gripper at the end of the episode, so the
+    # task cannot succeed -- a gripper is not a shelf. This check also catches the
+    # degenerate case that the plan-repair work turned up: a truncated generation
+    # can leave one well-formed node behind, and without this the repaired
+    # fragment schedules cleanly as a "plan" that opens the drawer, picks the
+    # plate and stops. Executing that is strictly worse than rejecting it, because
+    # a rejection hands the episode to the deterministic planner and a short plan
+    # does not.
+    released = {n.args["object"] for n in graph.nodes if n.skill == "place"}
+    still_held = sorted(held_by_a_pick - released)
+    if still_held:
+        raise PlannerError(
+            f"plan picks {still_held} and never places them -- the episode would "
+            f"end with {'them' if len(still_held) > 1 else 'it'} still in a gripper")
 
     for n in graph.nodes:
         if n.arm == "any" or n.skill in ("home", "handoff", "pour"):
@@ -447,6 +525,12 @@ def _repair_json(blob: str) -> str:
     s = blob
     # '"skill":": "pick"'  ->  '"skill": "pick"'      (doubled colon)
     s = re.sub(r':\s*":\s*"', ': "', s)
+    # '"skill":_open_drawer"'  ->  '"skill": "open_drawer"'
+    # An underscore where the opening quote belongs. Worth its own rule because
+    # of what it costs: it leaves the quote count odd, so the balanced-brace
+    # scanner thinks the rest of the answer is one long string and reports "no
+    # JSON object in model output" -- one wrong byte discarding a whole plan.
+    s = re.sub(r':\s*_([A-Za-z][A-Za-z0-9_]*)"', r': "\1"', s)
     # '"deps":": [' -> '"deps": ['
     s = re.sub(r':\s*":\s*\[', ': [', s)
     # ', " "arm": "A"'  ->  ', "arm": "A"'            (stray quote before a key)
